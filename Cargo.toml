@@ -6,6 +6,4 @@ edition = "2021"
 [dependencies]
 bevy = "0.15"
 
-[[bin]]
-name = "advanced-bevy-rendering"
-path = "advanced-bevy-rendering.rs"
+# Default binary is now src/main.rs
