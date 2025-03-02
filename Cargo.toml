@@ -1,0 +1,15 @@
+[package]
+name = "testilu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.15"
+
+[[bin]]
+name = "basic-bevy-example"
+path = "basic-bevy-example.rs"
+
+[[bin]]
+name = "advanced-bevy-rendering"
+path = "advanced-bevy-rendering.rs"
