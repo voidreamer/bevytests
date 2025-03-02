@@ -38,7 +38,6 @@ fn main() {
             .set(ImagePlugin::default_nearest()))
         // Add our third-person game plugin
         .add_plugins((
-            rendering::RenderingPlugin,
             player::PlayerPlugin,
             camera::CameraPlugin,
             world::WorldPlugin,

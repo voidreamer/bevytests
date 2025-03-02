@@ -9,7 +9,6 @@ use bevy::{
     core_pipeline::prepass::DepthPrepass,
 };
 use crate::player::Player;
-use crate::rendering::AdvancedRenderingSettings;
 
 #[derive(Component)]
 pub struct ThirdPersonCamera {
@@ -45,7 +44,6 @@ impl Default for ThirdPersonCamera {
 // Spawn camera system
 fn spawn_camera(
     mut commands: Commands,
-    advanced_settings: Res<AdvancedRenderingSettings>,
 ) {
     // Set up the camera with base components
     let camera_transform = Transform::from_xyz(0.0, 0.0, 0.0);
@@ -58,7 +56,6 @@ fn spawn_camera(
         
         // Bloom effect for emissive materials
         Bloom {
-            intensity: advanced_settings.bloom_intensity,
             ..default()
         },
         

@@ -3,7 +3,6 @@ use bevy::{
     core_pipeline::prepass::DepthPrepass,
 };
 use avian3d::prelude::*; // Add Avian3D prelude for physics components
-use crate::rendering::{AdvancedRenderingSettings, HighQualityObject};
 use crate::player::Player;
 
 // Scene creation system with physics
@@ -11,7 +10,6 @@ pub fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    _advanced_settings: Res<AdvancedRenderingSettings>,
 ) {
     println!("Spawning third-person game world with physics...");
     
@@ -35,7 +33,6 @@ pub fn spawn_scene(
         Collider::cuboid(ground_size, 0.1, ground_size), // Thin box collider
         Mesh3d(_ground_mesh), // Mesh for physics visualization
         MeshMaterial3d(_ground_material), 
-        HighQualityObject,
         DepthPrepass,
     ));
     
@@ -60,7 +57,6 @@ pub fn spawn_scene(
         MeshMaterial3d(player_material.clone()),
         Transform::from_xyz(0.0, 0.8, 0.0),
         Player::default(),
-        HighQualityObject,
         DepthPrepass,
     )).id();
     
@@ -90,8 +86,6 @@ pub fn spawn_scene(
             Mesh3d(pillar_mesh.clone()),
             MeshMaterial3d(pillar_material.clone()),
             Transform::from_xyz(x, 3.0, z),
-            HighQualityObject,
-            DepthPrepass,
         ));
     }
     
@@ -117,8 +111,6 @@ pub fn spawn_scene(
             Mesh3d(meshes.add(Cuboid::from_length(1.0))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(x, 0.5, z),
-            HighQualityObject,
-            DepthPrepass,
         ));
     }
     
@@ -143,8 +135,6 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
-            HighQualityObject,
-            DepthPrepass,
         ));
     }
 }
