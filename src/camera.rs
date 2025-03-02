@@ -7,6 +7,11 @@ use bevy::{
     },
     core_pipeline::bloom::Bloom,
     core_pipeline::prepass::DepthPrepass,
+    core_pipeline::tonemapping::Tonemapping,
+    core_pipeline::experimental::taa::TemporalAntiAliasing,
+    pbr::VolumetricFog,
+    pbr::{ScreenSpaceAmbientOcclusion,ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceReflections}
+
 };
 use crate::player::Player;
 
@@ -52,19 +57,44 @@ fn spawn_camera(
     commands.spawn((
         // Core camera components
         Camera3d::default(),
+        Camera {
+            hdr: true,
+            ..default()
+        },
         camera_transform,
         
         // Bloom effect for emissive materials
         Bloom {
+            intensity: 0.03,
             ..default()
         },
+        Tonemapping::TonyMcMapface,
+        Msaa::Off,
         
         // Add depth prepass for post-processing
         DepthPrepass,
         
         // Add third-person camera controller
         ThirdPersonCamera::default(),
-    ));
+    ))
+    /* //Uncomment to enable volumetric fog
+    .insert(VolumetricFog {
+        ambient_intensity: 5.0,
+        ..default()
+    })
+    */
+    .insert(ScreenSpaceAmbientOcclusion{
+        quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
+        constant_object_thickness: 0.5,
+        ..default()
+    })
+    .insert(ScreenSpaceReflections{
+        ..default()
+    })
+    .insert(TemporalAntiAliasing {
+        ..default()
+    });
+
 }
 
 // Third-person camera controller

@@ -1,6 +1,7 @@
 use bevy::{
     prelude::*,
     pbr::CascadeShadowConfigBuilder,
+    pbr::VolumetricLight,
 };
 
 #[derive(Component, Default)]
@@ -74,6 +75,7 @@ fn spawn_lighting(
             shadows_enabled: true,
             ..default()
         },
+        VolumetricLight,
         Transform::from_xyz(0.0, 5.0, 0.0),
         AnimatedLight::default(),
     ));
@@ -87,6 +89,7 @@ fn spawn_lighting(
             shadows_enabled: true,
             ..default()
         },
+        VolumetricLight,
         Transform::from_xyz(5.0, 2.0, 5.0),
         AnimatedLight::default(),
     ));

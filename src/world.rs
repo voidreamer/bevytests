@@ -30,7 +30,7 @@ pub fn spawn_scene(
     
     commands.spawn((
         RigidBody::Static,           // Static rigid body (immovable)
-        Collider::cuboid(ground_size, 0.1, ground_size), // Thin box collider
+        Collider::cuboid(ground_size, 0.01, ground_size), // Thin box collider
         Mesh3d(_ground_mesh), // Mesh for physics visualization
         MeshMaterial3d(_ground_material), 
         DepthPrepass,
@@ -48,11 +48,12 @@ pub fn spawn_scene(
         ..default()
     });
     
-    let player_body = meshes.add(Cylinder::new(0.5, 1.6));
+    let player_body = meshes.add(Capsule3d::new(0.4, 1.0));
     
     // Player entity
     let _player = commands.spawn((
         RigidBody::Static,        
+        Collider::capsule(0.4, 1.0), 
         Mesh3d(player_body),
         MeshMaterial3d(player_material.clone()),
         Transform::from_xyz(0.0, 0.8, 0.0),
@@ -83,6 +84,7 @@ pub fn spawn_scene(
         
         commands.spawn((
             RigidBody::Static,
+            Collider::cylinder(0.7, 6.0), 
             Mesh3d(pillar_mesh.clone()),
             MeshMaterial3d(pillar_material.clone()),
             Transform::from_xyz(x, 3.0, z),
@@ -110,7 +112,7 @@ pub fn spawn_scene(
             AngularVelocity(Vec3::new(2.5, 3.5, 1.5)),
             Mesh3d(meshes.add(Cuboid::from_length(1.0))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-            Transform::from_xyz(x, 0.5, z),
+            Transform::from_xyz(x, 5.5, z),
         ));
     }
     
@@ -135,6 +137,8 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
+            RigidBody::Dynamic,        
+            Collider::sphere(0.8), 
         ));
     }
 }
