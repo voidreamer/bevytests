@@ -2,7 +2,7 @@ use bevy::{
     prelude::*,
     core_pipeline::prepass::DepthPrepass,
 };
-use crate::rendering::{AdvancedRenderingSettings, HighQualityObject};
+use crate::rendering::{AdvancedRenderingSettings, HighQualityObject, DepthOfFieldSettings};
 use crate::player::Player;
 
 // Scene creation system
@@ -11,6 +11,7 @@ pub fn spawn_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     _advanced_settings: Res<AdvancedRenderingSettings>,
+    _depth_of_field_settings: Res<DepthOfFieldSettings>,
 ) {
     println!("Spawning third-person game world...");
     

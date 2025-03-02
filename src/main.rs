@@ -12,7 +12,7 @@ mod lighting;
 fn main() {
     println!("Starting Third-Person Example...");
     println!("Controls:");
-    println!("  - WASD: Move player");
+    println!("  - WASD : Move player");
     println!("  - Space: Jump");
     println!("  - Mouse: Control camera");
     println!("  - Mouse Wheel: Zoom in/out");

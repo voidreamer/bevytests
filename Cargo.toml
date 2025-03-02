@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.15"
+bevy = {version="0.15", features = ["dynamic_linking", "file_watcher", "shader_format_glsl"] }
 
 # Default binary is now src/main.rs
