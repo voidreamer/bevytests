@@ -1,4 +1,4 @@
-# Advanced Bevy 3D Demo
+# Bevy 3D Tests
 
 This project is a demonstration of advanced Bevy 3D rendering techniques and game mechanics. It showcases a simple third-person game with player movement, camera controls, and dynamic lighting.
 
