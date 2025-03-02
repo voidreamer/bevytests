@@ -2,6 +2,7 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions, Window},
 };
+use avian3d::prelude::*;
 
 mod rendering;
 mod player;
@@ -42,6 +43,7 @@ fn main() {
             camera::CameraPlugin,
             world::WorldPlugin,
             lighting::LightingPlugin,
+            PhysicsPlugins::default()
         ))
         // Set a dark sky color
         .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))

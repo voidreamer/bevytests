@@ -18,12 +18,9 @@ pub struct ThirdPersonCamera {
     pub distance: f32,
     pub height_offset: f32,
     // Target offset for camera focus
-    pub target_offset: f32,
     pub rotation_speed: f32,
     pub zoom_speed: f32,
     pub smoothness: f32, // Camera lag factor (0 = instant, 1 = no movement)
-    // Radius for camera collision detection
-    pub collision_radius: f32,
     // Camera controls inversion flags
     pub invert_x: bool,
     pub invert_y: bool,
@@ -36,11 +33,9 @@ impl Default for ThirdPersonCamera {
             yaw: 0.0,            // Initial yaw angle in radians
             distance: 5.0,       // Distance behind player
             height_offset: 1.5,  // Camera height above player
-            target_offset: 1.0,  // Look ahead offset
             rotation_speed: 0.005, // Mouse sensitivity
             zoom_speed: 0.5,     // Scroll zoom sensitivity
             smoothness: 0.85,    // Camera lag
-            collision_radius: 0.3, // Camera collision sphere size
             invert_x: false,     // Don't invert horizontal mouse
             invert_y: false,     // Don't invert vertical mouse
         }
