@@ -56,12 +56,14 @@ struct ThirdPersonCamera {
     yaw: f32,
     distance: f32,
     height_offset: f32,
+    // Target offset for camera focus
     target_offset: f32,
     rotation_speed: f32,
     zoom_speed: f32,
     smoothness: f32, // Camera lag factor (0 = instant, 1 = no movement)
+    // Radius for camera collision detection
     collision_radius: f32,
-    // Adding camera controls inversion flags
+    // Camera controls inversion flags
     invert_x: bool,
     invert_y: bool,
 }
@@ -69,12 +71,17 @@ struct ThirdPersonCamera {
 // Advanced Rendering Settings
 #[derive(Resource)]
 struct AdvancedRenderingSettings {
+    // Bloom effect settings
     bloom_intensity: f32,
     bloom_threshold: f32,
+    
+    // Screen Space Ambient Occlusion settings
     ssao_radius: f32,
     ssao_intensity: f32,
-    ssr_enabled: bool,
-    taa_enabled: bool,
+    
+    // Additional rendering features
+    ssr_enabled: bool,    // Screen Space Reflections
+    taa_enabled: bool,    // Temporal Anti-Aliasing
 }
 
 impl Default for AdvancedRenderingSettings {
@@ -122,12 +129,9 @@ fn spawn_scene(
     let ground_mesh = meshes.add(Plane3d::default().mesh().size(ground_size, ground_size));
     
     commands.spawn((
-        MaterialMeshBundle {
-            mesh: Mesh3d(ground_mesh),
-            material: MeshMaterial3d(ground_material),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..default()
-        },
+        Mesh3d(ground_mesh),
+        MeshMaterial3d(ground_material),
+        Transform::from_xyz(0.0, 0.0, 0.0),
         HighQualityObject,
         DepthPrepass,
     ));
@@ -148,13 +152,10 @@ fn spawn_scene(
     let player_body = meshes.add(Cylinder::new(0.5, 1.6));
     
     // Player entity
-    let player = commands.spawn((
-        MaterialMeshBundle {
-            mesh: Mesh3d(player_body),
-            material: MeshMaterial3d(player_material.clone()),
-            transform: Transform::from_xyz(0.0, 0.8, 0.0),
-            ..default()
-        },
+    let _player = commands.spawn((
+        Mesh3d(player_body),
+        MeshMaterial3d(player_material.clone()),
+        Transform::from_xyz(0.0, 0.8, 0.0),
         Player::default(),
         HighQualityObject,
         DepthPrepass,
@@ -220,12 +221,9 @@ fn spawn_scene(
         let z = angle.cos() * distance;
         
         commands.spawn((
-            MaterialMeshBundle {
-                mesh: Mesh3d(pillar_mesh.clone()),
-                material: MeshMaterial3d(pillar_material.clone()),
-                transform: Transform::from_xyz(x, 3.0, z),
-                ..default()
-            },
+            Mesh3d(pillar_mesh.clone()),
+            MeshMaterial3d(pillar_material.clone()),
+            Transform::from_xyz(x, 3.0, z),
             HighQualityObject,
             DepthPrepass,
         ));
@@ -250,12 +248,9 @@ fn spawn_scene(
         let z = angle.cos() * distance;
         
         commands.spawn((
-            MaterialMeshBundle {
-                mesh: Mesh3d(obstacle_mesh.clone()),
-                material: MeshMaterial3d(obstacle_material.clone()),
-                transform: Transform::from_xyz(x, 0.5, z),
-                ..default()
-            },
+            Mesh3d(obstacle_mesh.clone()),
+            MeshMaterial3d(obstacle_material.clone()),
+            Transform::from_xyz(x, 0.5, z),
             HighQualityObject,
             DepthPrepass,
         ));
@@ -280,12 +275,9 @@ fn spawn_scene(
         let z = angle.cos() * distance;
         
         commands.spawn((
-            MaterialMeshBundle {
-                mesh: Mesh3d(sphere_mesh.clone()),
-                material: MeshMaterial3d(chrome_material.clone()),
-                transform: Transform::from_xyz(x, 1.0, z),
-                ..default()
-            },
+            Mesh3d(sphere_mesh.clone()),
+            MeshMaterial3d(chrome_material.clone()),
+            Transform::from_xyz(x, 1.0, z),
             HighQualityObject,
             DepthPrepass,
         ));
@@ -303,21 +295,20 @@ fn spawn_scene(
     }
     .build();
     
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: 20000.0,
             shadows_enabled: true,
             ..default()
         },
         cascade_shadow_config,
-        transform: Transform::from_rotation(Quat::from_euler(
+        Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
             -std::f32::consts::FRAC_PI_4,
             std::f32::consts::FRAC_PI_4,
             0.0,
         )),
-        ..default()
-    });
+    ));
     
     // Animated point light that will create dynamic reflections
     commands.spawn((
