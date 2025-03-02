@@ -6,14 +6,12 @@ use bevy::{
     core_pipeline::{
         bloom::Bloom,
         prepass::DepthPrepass,
-        tonemapping::Tonemapping,
     },
     window::{PrimaryWindow, CursorGrabMode, CursorOptions},
     input::{
         mouse::{MouseMotion, MouseWheel},
         keyboard::KeyCode,
     },
-    render::camera::Exposure,
 };
 
 // Components
@@ -63,6 +61,9 @@ struct ThirdPersonCamera {
     zoom_speed: f32,
     smoothness: f32, // Camera lag factor (0 = instant, 1 = no movement)
     collision_radius: f32,
+    // Adding camera controls inversion flags
+    invert_x: bool,
+    invert_y: bool,
 }
 
 // Advanced Rendering Settings
@@ -162,15 +163,14 @@ fn spawn_scene(
     // ==============================================
     // Third person camera
     // ==============================================
-    // In newer Bevy versions, some components are already included in Camera3d
-    let mut camera_bundle = Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    };
+    // Set up the camera with base components
+    let camera_transform = Transform::from_xyz(0.0, 0.0, 0.0);
     
     // Add bloom effect for emissive materials
     commands.spawn((
-        camera_bundle,
+        // Core camera components
+        Camera3d::default(),
+        camera_transform,
         
         // Bloom effect for emissive materials
         Bloom {
@@ -188,10 +188,12 @@ fn spawn_scene(
             distance: 5.0,       // Distance behind player
             height_offset: 1.5,  // Camera height above player
             target_offset: 1.0,  // Look ahead offset
-            rotation_speed: 0.1, // Mouse sensitivity
+            rotation_speed: 0.005, // Mouse sensitivity (reduced for better control)
             zoom_speed: 0.5,     // Scroll zoom sensitivity
-            smoothness: 0.9,     // Camera lag (0=instant, 1=max lag)
+            smoothness: 0.85,    // Camera lag (0=instant, 1=max lag)
             collision_radius: 0.3, // Camera collision sphere size
+            invert_x: false,     // Don't invert horizontal mouse
+            invert_y: false,     // Don't invert vertical mouse
         },
     ));
     
@@ -349,35 +351,60 @@ fn player_controller(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut player_query: Query<(&mut Player, &mut Transform)>,
+    camera_query: Query<(&Transform, &ThirdPersonCamera), Without<Player>>,
 ) {
     let dt = time.delta_secs();
+    
+    // Get camera transform for movement relative to camera view
+    let camera_transform = if let Ok((cam_transform, _)) = camera_query.get_single() {
+        Some(cam_transform)
+    } else {
+        None
+    };
     
     for (mut player, mut transform) in player_query.iter_mut() {
         // Default to keep existing velocity but apply gravity
         let mut direction = Vec3::ZERO;
         player.velocity.y -= player.gravity * dt; // Apply gravity
         
-        // Movement direction based on keyboard input
-        // Get local forward/right axes from the player's current orientation
-        let forward = transform.forward();
-        let right = transform.right();
-        
-        // Zero out Y component to make movement planar and renormalize
-        let forward = Vec3::new(forward.x, 0.0, forward.z).normalize_or_zero();
-        let right = Vec3::new(right.x, 0.0, right.z).normalize_or_zero();
-        
-        // Combine inputs for movement direction (fixed direction to match WASD)
-        if keyboard.pressed(KeyCode::KeyW) {
-            direction -= forward; // Fixed: W now moves forward
-        }
-        if keyboard.pressed(KeyCode::KeyS) {
-            direction += forward; // Fixed: S now moves backward
-        }
-        if keyboard.pressed(KeyCode::KeyA) {
-            direction -= right;
-        }
-        if keyboard.pressed(KeyCode::KeyD) {
-            direction += right;
+        // Get movement direction based on camera orientation
+        if let Some(camera) = camera_transform {
+            // Get camera's forward and right, but project onto XZ plane (ignore Y-component)
+            // This ensures WASD controls align with the camera's view direction
+            let cam_forward = camera.forward();
+            let cam_right = camera.right();
+            
+            // Project movement onto XZ plane by creating new vectors
+            let forward = Vec3::new(cam_forward.x, 0.0, cam_forward.z).normalize_or_zero();
+            let right = Vec3::new(cam_right.x, 0.0, cam_right.z).normalize_or_zero();
+            
+            // Calculate movement direction based on WASD keys
+            if keyboard.pressed(KeyCode::KeyW) {
+                direction += forward; // W moves forward relative to camera view
+            }
+            if keyboard.pressed(KeyCode::KeyS) {
+                direction -= forward; // S moves backward relative to camera view
+            }
+            if keyboard.pressed(KeyCode::KeyA) {
+                direction -= right; // A moves left relative to camera view
+            }
+            if keyboard.pressed(KeyCode::KeyD) {
+                direction += right; // D moves right relative to camera view
+            }
+        } else {
+            // Fallback to world-space movement if no camera is available
+            if keyboard.pressed(KeyCode::KeyW) {
+                direction += Vec3::NEG_Z;
+            }
+            if keyboard.pressed(KeyCode::KeyS) {
+                direction += Vec3::Z;
+            }
+            if keyboard.pressed(KeyCode::KeyA) {
+                direction += Vec3::NEG_X;
+            }
+            if keyboard.pressed(KeyCode::KeyD) {
+                direction += Vec3::X;
+            }
         }
         
         // Jump when on ground and space pressed
@@ -387,12 +414,14 @@ fn player_controller(
         }
         
         // Normalize horizontal movement if needed
-        direction = direction.normalize_or_zero();
+        if direction.length_squared() > 0.001 {
+            direction = direction.normalize();
+        }
         
-        // Apply movement
+        // Apply movement with appropriate speed
         let target_velocity = direction * player.speed;
         
-        // Smoothly blend horizontal velocity (XZ only)
+        // Smoothly blend horizontal velocity (XZ only) for more natural movement
         player.velocity.x = player.velocity.x * 0.8 + target_velocity.x * 0.2;
         player.velocity.z = player.velocity.z * 0.8 + target_velocity.z * 0.2;
         
@@ -414,10 +443,9 @@ fn player_controller(
         // Only rotate player if there's horizontal movement
         if direction.length_squared() > 0.001 {
             // Calculate the target rotation to face the movement direction
-            // Fixed: invert the direction so player faces the right way
             let target_rotation = Quat::from_rotation_arc(
                 Vec3::Z, 
-                -direction.normalize_or_zero()
+                direction.normalize()
             );
             
             // Smoothly rotate towards the target rotation
@@ -474,6 +502,7 @@ fn third_person_camera(
     if keyboard.just_pressed(KeyCode::Escape) {
         exit.send(AppExit::default());
     }
+    
     // Only update if we have a player and a camera
     if let (Ok(player_transform), Ok((mut camera_transform, mut camera_params))) = 
           (player_query.get_single(), camera_query.get_single_mut()) {
@@ -483,12 +512,18 @@ fn third_person_camera(
         let window_focused = window.focused;
         
         if window_focused {
-            // Update camera yaw (left/right rotation)
+            // Update camera rotation based on mouse movement
             for event in mouse_motion.read() {
-                camera_params.yaw -= event.delta.x * camera_params.rotation_speed;
-                camera_params.pitch -= event.delta.y * camera_params.rotation_speed;
+                // Apply inversion if configured (note: we're using positive values here because
+                // we've already adjusted the signs based on the expected behavior)
+                let dx = if camera_params.invert_x { -event.delta.x } else { event.delta.x };
+                let dy = if camera_params.invert_y { -event.delta.y } else { event.delta.y };
                 
-                // Clamp pitch to prevent flipping
+                // Apply rotation speed
+                camera_params.yaw -= dx * camera_params.rotation_speed;
+                camera_params.pitch += dy * camera_params.rotation_speed;
+                
+                // Clamp pitch to prevent flipping (limit how far up/down the camera can look)
                 camera_params.pitch = camera_params.pitch.clamp(-1.4, 0.8);
             }
             
@@ -500,39 +535,39 @@ fn third_person_camera(
             }
         }
         
-        // Calculate the desired camera position
-        // 1. Start with player position
+        // Get player position as the center point
         let player_pos = player_transform.translation;
         
-        // 2. Calculate rotation quaternions
+        // Create rotation quaternions from euler angles
         let pitch_rot = Quat::from_rotation_x(camera_params.pitch);
         let yaw_rot = Quat::from_rotation_y(camera_params.yaw);
         let camera_rotation = yaw_rot * pitch_rot;
         
-        // 3. Calculate camera position offset (behind and above player)
-        // Fixed: negative distance to put camera behind player
+        // Calculate the orbital camera position
         let camera_offset = camera_rotation * Vec3::new(
             0.0,
             camera_params.height_offset,
-            -camera_params.distance
+            camera_params.distance // Positive distance is behind in orbital coordinates
         );
         
-        // 4. Calculate where to look (ahead of player)
-        let forward = player_transform.forward();
-        let forward_xz = Vec3::new(forward.x, 0.0, forward.z).normalize_or_zero();
-        let focus_pos = player_pos + forward_xz * camera_params.target_offset + Vec3::new(0.0, camera_params.height_offset * 0.5, 0.0);
-        
-        // 5. Calculate final camera position
+        // The camera should be positioned behind the player
         let target_position = player_pos - camera_offset;
         
-        // 6. Apply smoothing/lag to camera movement
+        // Calculate the focus point (where the camera should look)
+        // Look at the player position with a slight height offset but don't use target_offset
+        let focus_pos = player_pos + Vec3::new(0.0, camera_params.height_offset * 0.5, 0.0);
+        
+        // Apply smoothing for camera movement (creates a more natural following effect)
         let smooth_factor = camera_params.smoothness.clamp(0.0, 0.99);
+        let lerp_factor = 1.0 - smooth_factor.powf(time.delta_secs() * 60.0); // Frame-rate independent
+        
+        // Smoothly move camera toward target position
         camera_transform.translation = camera_transform.translation.lerp(
             target_position,
-            1.0 - smooth_factor.powf(time.delta_secs() * 60.0) // Frame-rate independent smoothing
+            lerp_factor
         );
         
-        // 7. Make camera look at player focus point
+        // Make camera look at the focus point
         camera_transform.look_at(focus_pos, Vec3::Y);
     }
 }
