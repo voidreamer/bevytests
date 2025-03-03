@@ -52,7 +52,7 @@ pub fn spawn_scene(
     
     // Player entity
     let _player = commands.spawn((
-        RigidBody::Static,        
+        RigidBody::Kinematic,        
         Collider::capsule(0.4, 1.0), 
         Mesh3d(player_body),
         MeshMaterial3d(player_material.clone()),
