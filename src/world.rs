@@ -10,6 +10,7 @@ pub fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     println!("Spawning third-person game world with physics...");
     
@@ -48,9 +49,10 @@ pub fn spawn_scene(
         ..default()
     });
     
-    let player_body = meshes.add(Capsule3d::new(0.4, 1.0));
+    // let player_body = meshes.add(Capsule3d::new(0.4, 1.0));
     
     // Player entity
+    /*
     let _player = commands.spawn((
         RigidBody::Kinematic,        
         Collider::capsule(0.4, 1.0), 
@@ -59,6 +61,16 @@ pub fn spawn_scene(
         Transform::from_xyz(0.0, 0.8, 0.0),
         Player::default(),
         DepthPrepass,
+    )).id();
+    */
+    commands.spawn((
+        SceneRoot(asset_server.load(
+        "models/character.glb#Scene0")),
+        RigidBody::Kinematic,        
+        Collider::capsule(0.4, 2.0), 
+        Player::default(),
+        DepthPrepass,
+        Transform::from_xyz(0.0, 0.8, 0.0),
     )).id();
     
     // ==============================================

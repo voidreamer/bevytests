@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    window::{CursorGrabMode, CursorOptions, Window},
+    window::{CursorGrabMode, CursorOptions, Window, WindowResolution},
 };
 use avian3d::prelude::*;
 
@@ -25,6 +25,7 @@ fn main() {
                 primary_window: Some(Window {
                     // Use vsync for better performance 
                     present_mode: bevy::window::PresentMode::AutoVsync,
+                    resolution: WindowResolution::new(1920., 1080.).with_scale_factor_override(1.0),
                     // Capture mouse for camera control
                     cursor_options: CursorOptions {
                         grab_mode: CursorGrabMode::Confined,

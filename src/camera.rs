@@ -69,32 +69,34 @@ fn spawn_camera(
             ..default()
         },
         Tonemapping::TonyMcMapface,
-        Msaa::Off,
+        //Msaa::On,
         
         // Add depth prepass for post-processing
         DepthPrepass,
         
         // Add third-person camera controller
         ThirdPersonCamera::default(),
-    ))
+    ));
     /* //Uncomment to enable volumetric fog
     .insert(VolumetricFog {
         ambient_intensity: 5.0,
         ..default()
     })
     */
+    /*
     .insert(ScreenSpaceAmbientOcclusion{
         quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
         constant_object_thickness: 0.5,
         ..default()
     })
+        
     .insert(ScreenSpaceReflections{
         ..default()
     })
     .insert(TemporalAntiAliasing {
         ..default()
     });
-
+    */
 }
 
 // Third-person camera controller
