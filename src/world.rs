@@ -155,13 +155,14 @@ fn spawn_text(commands: &mut Commands){
 fn create_help_text() -> Text {
     format!(
         "Lavid and Vlare adventures\n
-WASD: Move player\n
+WASD: Move player (W switches to running animation)\n
 Space: Jump\n
 Mouse: Control camera\n
 Mouse Wheel: Zoom in/out\n
-1/2/3: Switch animations\n
+1: Force idle animation\n
+2: T-pose animation\n
 P: Pause/Resume animation\n
-Arrow Keys: Control animation\n
+Arrow Keys: Adjust animation speed/timing\n
 ESC: Exit game\n",
     )
     .into()

@@ -86,31 +86,50 @@ pub fn keyboard_animation_control(
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<Animations>,
     mut current_animation: Local<usize>,
+    mut is_moving: Local<bool>,
 ) {
     for (mut player, mut transitions) in &mut animation_players {
         let Some((&playing_animation_index, _)) = player.playing_animations().next() else {
             continue;
         };
 
-        // Switch between animations (1, 2, 3 keys)
-        if keyboard_input.just_pressed(KeyCode::Digit1) && *current_animation != 0 {
-            *current_animation = 0;
-            transitions
-                .play(&mut player, animations.animations[0], Duration::from_secs_f32(0.5))
-                .repeat();
+        // Handle running animation with W key
+        let was_moving = *is_moving;
+        
+        // Check if W is pressed to trigger running animation
+        if keyboard_input.pressed(KeyCode::KeyW) {
+            *is_moving = true;
+            // Only switch if we weren't already moving
+            if !was_moving || *current_animation != 2 {
+                *current_animation = 2;
+                transitions
+                    .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.25))
+                    .repeat();
+            }
+        } else {
+            // Return to idle when W is released
+            *is_moving = false;
+            if was_moving || (*current_animation != 0 && *current_animation != 1) {
+                *current_animation = 0;
+                transitions
+                    .play(&mut player, animations.animations[0], Duration::from_secs_f32(0.25))
+                    .repeat();
+            }
         }
         
-        if keyboard_input.just_pressed(KeyCode::Digit2) && *current_animation != 1 {
+        // Manual animation override for T-pose
+        if keyboard_input.just_pressed(KeyCode::Digit2) {
             *current_animation = 1;
             transitions
-                .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.5))
+                .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
                 .repeat();
         }
         
-        if keyboard_input.just_pressed(KeyCode::Digit3) && *current_animation != 2 {
-            *current_animation = 2;
+        // Manually go back to idle
+        if keyboard_input.just_pressed(KeyCode::Digit1) {
+            *current_animation = 0;
             transitions
-                .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.5))
+                .play(&mut player, animations.animations[0], Duration::from_secs_f32(0.25))
                 .repeat();
         }
 
