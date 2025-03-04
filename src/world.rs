@@ -1,6 +1,7 @@
 use bevy::{
     prelude::*,
     core_pipeline::prepass::DepthPrepass,
+    pbr::FogVolume,
 };
 use avian3d::prelude::*; // Add Avian3D prelude for physics components
 use crate::player::Player;
@@ -38,31 +39,8 @@ pub fn spawn_scene(
     ));
     
     // ==============================================
-    // Create player character (dynamic for now)
+    // Create player character 
     // ==============================================
-    let player_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.7, 0.2, 0.1),
-        emissive: Color::srgb(0.14, 0.04, 0.02).into(),
-        metallic: 0.2,
-        perceptual_roughness: 0.5,
-        reflectance: 0.5,
-        ..default()
-    });
-    
-    // let player_body = meshes.add(Capsule3d::new(0.4, 1.0));
-    
-    // Player entity
-    /*
-    let _player = commands.spawn((
-        RigidBody::Kinematic,        
-        Collider::capsule(0.4, 1.0), 
-        Mesh3d(player_body),
-        MeshMaterial3d(player_material.clone()),
-        Transform::from_xyz(0.0, 0.8, 0.0),
-        Player::default(),
-        DepthPrepass,
-    )).id();
-    */
     commands.spawn((
         SceneRoot(asset_server.load(
         "models/character.glb#Scene0")),
@@ -71,7 +49,12 @@ pub fn spawn_scene(
         Player::default(),
         DepthPrepass,
         Transform::from_xyz(0.0, 0.8, 0.0),
-    )).id();
+    ));
+
+    commands.spawn(FogVolume{
+        density_factor: 0.02,
+        ..default()
+    });
     
     // ==============================================
     // Create environment props
@@ -155,11 +138,37 @@ pub fn spawn_scene(
     }
 }
 
+// ==============================================
+// Some simple UI text 
+// ==============================================
+
+fn spawn_text(commands: &mut Commands){
+    commands.spawn((
+        create_help_text(),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        }
+    ));
+}
+fn create_help_text() -> Text {
+    format!(
+        "Lavid and Vlare adventures",
+    )
+    .into()
+}
+
+fn setup(mut commands: Commands){
+    spawn_text(&mut commands);
+}
+
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, spawn_scene);
+        app.add_systems(Startup, setup)
+           .add_systems(Startup, spawn_scene);
     }
 }

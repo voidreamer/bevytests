@@ -55,7 +55,7 @@ fn spawn_lighting(
     
     commands.spawn((
         DirectionalLight {
-            illuminance: 20000.0,
+            illuminance: 15000.0,
             shadows_enabled: true,
             ..default()
         },
@@ -74,7 +74,7 @@ fn spawn_lighting(
             color: Color::srgb(1.0, 0.5, 0.3),
             intensity: 5000.0,
             range: 15.0,
-            shadows_enabled: true,
+            shadows_enabled: false,
             ..default()
         },
         VolumetricLight,
@@ -88,7 +88,7 @@ fn spawn_lighting(
             color: Color::srgb(0.1, 0.3, 1.0),
             intensity: 3000.0,
             range: 12.0,
-            shadows_enabled: true,
+            shadows_enabled: false,
             ..default()
         },
         VolumetricLight,

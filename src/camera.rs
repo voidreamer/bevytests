@@ -6,11 +6,12 @@ use bevy::{
         keyboard::KeyCode,
     },
     core_pipeline::bloom::Bloom,
+    core_pipeline::motion_blur::MotionBlur,
     core_pipeline::prepass::DepthPrepass,
     core_pipeline::tonemapping::Tonemapping,
     core_pipeline::experimental::taa::TemporalAntiAliasing,
     pbr::VolumetricFog,
-    pbr::{ScreenSpaceAmbientOcclusion,ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceReflections}
+    pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceReflections}
 
 };
 use crate::player::Player;
@@ -37,7 +38,7 @@ impl Default for ThirdPersonCamera {
             yaw: 0.0,            // Initial yaw angle in radians
             distance: 5.0,       // Distance behind player
             height_offset: 1.5,  // Camera height above player
-            rotation_speed: 0.005, // Mouse sensitivity
+            rotation_speed: 0.004, // Mouse sensitivity
             zoom_speed: 0.5,     // Scroll zoom sensitivity
             smoothness: 0.85,    // Camera lag
             invert_x: false,     // Don't invert horizontal mouse
@@ -49,55 +50,57 @@ impl Default for ThirdPersonCamera {
 // Spawn camera system
 fn spawn_camera(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
-    // Set up the camera with base components
-    let camera_transform = Transform::from_xyz(0.0, 0.0, 0.0);
-    
-    // Add bloom effect for emissive materials
     commands.spawn((
-        // Core camera components
         Camera3d::default(),
         Camera {
             hdr: true,
             ..default()
         },
-        camera_transform,
+        Transform::from_xyz(0.0, 0.0, 0.0),
+
+        DistanceFog{
+            color: Color::srgb_u8(43, 44, 100),
+            falloff: FogFalloff::Exponential{
+                density: 15e-3,
+            },
+            ..default()
+        },
         
-        // Bloom effect for emissive materials
         Bloom {
             intensity: 0.03,
             ..default()
         },
         Tonemapping::TonyMcMapface,
-        //Msaa::On,
+        // Msaa is off to let ssao work.
+        Msaa::Off,
+        // TODO: SSAO doesnt seem to work despite I get no errors.
+        ScreenSpaceAmbientOcclusion::default(),
+        TemporalAntiAliasing::default(),
         
         // Add depth prepass for post-processing
-        DepthPrepass,
+        MotionBlur{
+            samples: 8,
+            shutter_angle: 1.5,
+            ..default()
+        },
+        VolumetricFog {
+            ambient_intensity: 5.0,
+            ..default()
+        },
+
+        EnvironmentMapLight{
+            diffuse_map: asset_server.load("environment_maps/pisa_diffuse_rgb9e5_zstd.ktx2"),
+            specular_map: asset_server.load("environment_maps/pisa_specular_rgb9e5_zstd.ktx2"),
+            intensity: 2000.0,
+            ..default()
+        },
         
         // Add third-person camera controller
         ThirdPersonCamera::default(),
-    ));
-    /* //Uncomment to enable volumetric fog
-    .insert(VolumetricFog {
-        ambient_intensity: 5.0,
-        ..default()
-    })
-    */
-    /*
-    .insert(ScreenSpaceAmbientOcclusion{
-        quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
-        constant_object_thickness: 0.5,
-        ..default()
-    })
-        
-    .insert(ScreenSpaceReflections{
-        ..default()
-    })
-    .insert(TemporalAntiAliasing {
-        ..default()
-    });
-    */
-}
+));}
+    
 
 // Third-person camera controller
 fn third_person_camera(
@@ -188,6 +191,6 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_camera)
-            .add_systems(Update, third_person_camera);
+           .add_systems(Update, third_person_camera);
     }
 }
