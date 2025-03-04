@@ -1,10 +1,11 @@
 use bevy::{
     prelude::*,
-    core_pipeline::prepass::DepthPrepass,
-    pbr::FogVolume,
+    // pbr::FogVolume,
 };
 use avian3d::prelude::*; // Add Avian3D prelude for physics components
 use crate::player::Player;
+
+const CHARACTER_PATH: &str = "models/character.glb";
 
 // Scene creation system with physics
 pub fn spawn_scene(
@@ -16,7 +17,7 @@ pub fn spawn_scene(
     println!("Spawning third-person game world with physics...");
     
     let ground_size = 50.0;
-    
+
     // ==============================================
     // Create ground plane (static)
     // ==============================================
@@ -31,35 +32,33 @@ pub fn spawn_scene(
     let _ground_mesh = meshes.add(Plane3d::default().mesh().size(ground_size, ground_size));
     
     commands.spawn((
-        RigidBody::Static,           // Static rigid body (immovable)
-        Collider::cuboid(ground_size, 0.01, ground_size), // Thin box collider
-        Mesh3d(_ground_mesh), // Mesh for physics visualization
+        RigidBody::Static,           
+        Collider::cuboid(ground_size, 0.01, ground_size), 
+        Mesh3d(_ground_mesh), 
         MeshMaterial3d(_ground_material), 
-        DepthPrepass,
     ));
     
     // ==============================================
     // Create player character 
     // ==============================================
     commands.spawn((
-        SceneRoot(asset_server.load(
-        "models/character.glb#Scene0")),
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
         RigidBody::Kinematic,        
         Collider::capsule(0.4, 2.0), 
         Player::default(),
-        DepthPrepass,
-        Transform::from_xyz(0.0, 0.8, 0.0),
     ));
-
-    commands.spawn(FogVolume{
-        density_factor: 0.02,
-        ..default()
-    });
     
     // ==============================================
     // Create environment props
     // ==============================================
-    
+
+    /*
+    commands.spawn(FogVolume{
+        density_factor: 0.02,
+        ..default()
+    });
+    */
+
     // Create some pillars (static)
     let pillar_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.7, 0.7, 0.8),
@@ -155,7 +154,16 @@ fn spawn_text(commands: &mut Commands){
 }
 fn create_help_text() -> Text {
     format!(
-        "Lavid and Vlare adventures",
+        "Lavid and Vlare adventures\n
+WASD: Move player (W switches to running animation)\n
+Space: Jump\n
+Mouse: Control camera\n
+Mouse Wheel: Zoom in/out\n
+1: Force idle animation\n
+2: T-pose animation\n
+P: Pause/Resume animation\n
+Arrow Keys: Adjust animation speed/timing\n
+ESC: Exit game\n",
     )
     .into()
 }

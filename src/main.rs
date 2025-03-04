@@ -9,6 +9,7 @@ mod player;
 mod camera;
 mod world;
 mod lighting;
+mod animation;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -18,13 +19,16 @@ fn main() {
     println!("  - Mouse: Control camera");
     println!("  - Mouse Wheel: Zoom in/out");
     println!("  - ESC: Exit game");
+    println!("  - 1/2/3: Switch animations");
+    println!("  - P: Pause/Resume animation");
+    println!("  - Arrow Keys: Control animation playback");
     
     App::new()
         .add_plugins(DefaultPlugins
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     // Use vsync for better performance 
-                    mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
+                    //mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
                     present_mode: bevy::window::PresentMode::AutoVsync,
                     resolution: WindowResolution::new(1920., 1080.).with_scale_factor_override(1.0),
                     // Capture mouse for camera control
@@ -44,6 +48,7 @@ fn main() {
             camera::CameraPlugin,
             world::WorldPlugin,
             lighting::LightingPlugin,
+            animation::PlayerAnimationPlugin,
             PhysicsPlugins::default()
         ))
         // Set a dark sky color

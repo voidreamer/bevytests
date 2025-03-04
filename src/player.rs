@@ -3,6 +3,8 @@ use bevy::{
     input::keyboard::KeyCode,
 };
 use crate::camera::ThirdPersonCamera;
+use crate::animation::Animations;
+use std::time::Duration;
 
 #[derive(Component)]
 pub struct Player {
@@ -13,6 +15,8 @@ pub struct Player {
     pub ground_offset: f32,
     pub on_ground: bool,
     pub velocity: Vec3,
+    pub is_moving: bool,
+    pub current_animation: u8, // 0: idle, 1: tpose, 2: running
 }
 
 impl Default for Player {
@@ -25,6 +29,8 @@ impl Default for Player {
             ground_offset: 0.8, // Character height/2
             on_ground: false,
             velocity: Vec3::ZERO,
+            is_moving: false,
+            current_animation: 0, // Start with idle animation
         }
     }
 }
@@ -96,8 +102,12 @@ fn player_controller(
             player.on_ground = false;
         }
         
+        // Check if player is moving horizontally
+        let is_moving = direction.length_squared() > 0.001;
+        player.is_moving = is_moving;
+        
         // Normalize horizontal movement if needed
-        if direction.length_squared() > 0.001 {
+        if is_moving {
             direction = direction.normalize();
         }
         
@@ -124,7 +134,7 @@ fn player_controller(
         transform.translation += displacement;
         
         // Only rotate player if there's horizontal movement
-        if direction.length_squared() > 0.001 {
+        if is_moving {
             // Calculate the target rotation to face the movement direction
             let target_rotation = Quat::from_rotation_arc(
                 Vec3::Z, 
@@ -140,11 +150,14 @@ fn player_controller(
     }
 }
 
+// Note: Animation control is now handled directly in animation.rs module
+
 // Plugin for player functionality
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, player_controller);
+        // Animation control is now handled in animation.rs
     }
 }
