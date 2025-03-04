@@ -23,7 +23,7 @@ impl Default for Player {
     fn default() -> Self {
         Self {
             speed: 5.0,
-            turn_speed: 2.5,
+            turn_speed: 5.5,
             gravity: 20.0,
             jump_force: 8.0,
             ground_offset: 0.8, // Character height/2
