@@ -7,11 +7,10 @@ use bevy::{
     },
     core_pipeline::bloom::Bloom,
     core_pipeline::motion_blur::MotionBlur,
-    core_pipeline::prepass::DepthPrepass,
     core_pipeline::tonemapping::Tonemapping,
-    core_pipeline::experimental::taa::TemporalAntiAliasing,
+    core_pipeline::experimental::taa::{TemporalAntiAliasing, TemporalAntiAliasPlugin},
     pbr::VolumetricFog,
-    pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceReflections}
+    pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel},
 
 };
 use crate::player::Player;
@@ -86,7 +85,7 @@ fn spawn_camera(
             ..default()
         },
         VolumetricFog {
-            ambient_intensity: 5.0,
+            ambient_intensity: 0.5,
             ..default()
         },
 
@@ -99,7 +98,12 @@ fn spawn_camera(
         
         // Add third-person camera controller
         ThirdPersonCamera::default(),
-));}
+    ))
+    .insert(ScreenSpaceAmbientOcclusion{
+        quality_level: ScreenSpaceAmbientOcclusionQualityLevel::High,
+        constant_object_thickness: 4.0,
+    });
+}
     
 
 // Third-person camera controller
@@ -191,6 +195,7 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_camera)
+           .add_plugins(TemporalAntiAliasPlugin)
            .add_systems(Update, third_person_camera);
     }
 }

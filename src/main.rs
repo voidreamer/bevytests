@@ -24,7 +24,7 @@ fn main() {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     // Use vsync for better performance 
-                    mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
+                    //mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
                     present_mode: bevy::window::PresentMode::AutoVsync,
                     resolution: WindowResolution::new(1920., 1080.).with_scale_factor_override(1.0),
                     // Capture mouse for camera control

@@ -72,9 +72,9 @@ fn spawn_lighting(
     commands.spawn((
         PointLight {
             color: Color::srgb(1.0, 0.5, 0.3),
-            intensity: 5000.0,
-            range: 15.0,
-            shadows_enabled: false,
+            intensity: 1000.0,
+            range: 150.0,
+            shadows_enabled: true,
             ..default()
         },
         VolumetricLight,
@@ -87,7 +87,7 @@ fn spawn_lighting(
         PointLight {
             color: Color::srgb(0.1, 0.3, 1.0),
             intensity: 3000.0,
-            range: 12.0,
+            range: 120.0,
             shadows_enabled: false,
             ..default()
         },

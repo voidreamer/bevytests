@@ -1,10 +1,19 @@
+use std::time::Duration;
 use bevy::{
     prelude::*,
-    core_pipeline::prepass::DepthPrepass,
-    pbr::FogVolume,
+    // pbr::FogVolume,
+    animation::{AnimationTargetId, RepeatAnimation},
 };
 use avian3d::prelude::*; // Add Avian3D prelude for physics components
 use crate::player::Player;
+
+const CHARACTER_PATH: &str = "models/character.glb";
+
+#[derive(Resource)]
+struct Animations {
+    animations: Vec<AnimationNodeIndex>,
+    graph: Handle<AnimationGraph>,
+}
 
 // Scene creation system with physics
 pub fn spawn_scene(
@@ -12,10 +21,23 @@ pub fn spawn_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     println!("Spawning third-person game world with physics...");
     
     let ground_size = 50.0;
+
+
+    let (graph, node_indices) = AnimationGraph::from_clips([
+        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
+    ]);
+    let graph_handle = graphs.add(graph);
+    commands.insert_resource(Animations{
+        animations: node_indices,
+        graph: graph_handle,
+    });
     
     // ==============================================
     // Create ground plane (static)
@@ -31,35 +53,33 @@ pub fn spawn_scene(
     let _ground_mesh = meshes.add(Plane3d::default().mesh().size(ground_size, ground_size));
     
     commands.spawn((
-        RigidBody::Static,           // Static rigid body (immovable)
-        Collider::cuboid(ground_size, 0.01, ground_size), // Thin box collider
-        Mesh3d(_ground_mesh), // Mesh for physics visualization
+        RigidBody::Static,           
+        Collider::cuboid(ground_size, 0.01, ground_size), 
+        Mesh3d(_ground_mesh), 
         MeshMaterial3d(_ground_material), 
-        DepthPrepass,
     ));
     
     // ==============================================
     // Create player character 
     // ==============================================
     commands.spawn((
-        SceneRoot(asset_server.load(
-        "models/character.glb#Scene0")),
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
         RigidBody::Kinematic,        
         Collider::capsule(0.4, 2.0), 
         Player::default(),
-        DepthPrepass,
-        Transform::from_xyz(0.0, 0.8, 0.0),
     ));
-
-    commands.spawn(FogVolume{
-        density_factor: 0.02,
-        ..default()
-    });
     
     // ==============================================
     // Create environment props
     // ==============================================
-    
+
+    /*
+    commands.spawn(FogVolume{
+        density_factor: 0.02,
+        ..default()
+    });
+    */
+
     // Create some pillars (static)
     let pillar_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.7, 0.7, 0.8),
@@ -155,7 +175,12 @@ fn spawn_text(commands: &mut Commands){
 }
 fn create_help_text() -> Text {
     format!(
-        "Lavid and Vlare adventures",
+        "Lavid and Vlare adventures\n
+WASD: Move player\n
+Space: Jump\n
+Mouse: Control camera\n
+Mouse Wheel: Zoom in/out\n
+ESC: Exit game\n",
     )
     .into()
 }
@@ -164,11 +189,62 @@ fn setup(mut commands: Commands){
     spawn_text(&mut commands);
 }
 
+
+// ==============================================
+// Setup player animation: TODO move this to a module.
+// ==============================================
+fn setup_scene_once_loaded(
+    mut commands: Commands,
+    animations: Res<Animations>,
+    graphs: Res<Assets<AnimationGraph>>,
+    mut clips: ResMut<Assets<AnimationClip>>,
+    mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+) {
+    fn get_clip<'a>(
+        node: AnimationNodeIndex,
+        graph: &AnimationGraph,
+        clips: &'a mut Assets<AnimationClip>,
+    ) -> &'a mut AnimationClip {
+        let node = graph.get(node).unwrap();
+        let clip = match &node.node_type {
+            AnimationNodeType::Clip(handle) => clips.get_mut(handle),
+            _ => unreachable!(),
+        };
+        clip.unwrap()
+    }
+
+    for (entity, mut player) in &mut players {
+        let graph = graphs.get(&animations.graph).unwrap();
+
+        let running_animation = get_clip(animations.animations[0], graph, &mut clips);
+        //println!("Running animation: {:?}", running_animation);
+        // You can determine the time an event should trigger if you know witch frame it occurs and
+        // the frame rate of the animation. Let's say we want to trigger an event at frame 15,
+        // and the animation has a frame rate of 24 fps, then time = 15 / 24 = 0.625.
+
+        let mut transitions = AnimationTransitions::new();
+
+        // Make sure to start the animation via the `AnimationTransitions`
+        // component. The `AnimationTransitions` component wants to manage all
+        // the animations and will get confused if the animations are started
+        // directly via the `AnimationPlayer`.
+        transitions
+            .play(&mut player, animations.animations[0], Duration::ZERO)
+            .repeat();
+
+        commands
+            .entity(entity)
+            .insert(AnimationGraphHandle(animations.graph.clone()))
+            .insert(transitions);
+    }
+}
+
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
+           .add_systems(Update, setup_scene_once_loaded)
            .add_systems(Startup, spawn_scene);
     }
 }
