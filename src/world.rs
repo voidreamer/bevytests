@@ -159,6 +159,9 @@ WASD: Move player\n
 Space: Jump\n
 Mouse: Control camera\n
 Mouse Wheel: Zoom in/out\n
+1/2/3: Switch animations\n
+P: Pause/Resume animation\n
+Arrow Keys: Control animation\n
 ESC: Exit game\n",
     )
     .into()

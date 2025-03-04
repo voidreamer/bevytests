@@ -9,6 +9,7 @@ mod player;
 mod camera;
 mod world;
 mod lighting;
+mod animation;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -18,6 +19,9 @@ fn main() {
     println!("  - Mouse: Control camera");
     println!("  - Mouse Wheel: Zoom in/out");
     println!("  - ESC: Exit game");
+    println!("  - 1/2/3: Switch animations");
+    println!("  - P: Pause/Resume animation");
+    println!("  - Arrow Keys: Control animation playback");
     
     App::new()
         .add_plugins(DefaultPlugins
@@ -44,6 +48,7 @@ fn main() {
             camera::CameraPlugin,
             world::WorldPlugin,
             lighting::LightingPlugin,
+            animation::PlayerAnimationPlugin,
             PhysicsPlugins::default()
         ))
         // Set a dark sky color
