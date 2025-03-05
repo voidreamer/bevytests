@@ -10,18 +10,22 @@ mod camera;
 mod world;
 mod lighting;
 mod animation;
+mod stats;   // New module for health, stamina, etc.
+mod render;  // New module for UI rendering
 
 fn main() {
     println!("Starting Third-Person Example...");
     println!("Controls:");
     println!("  - WASD: Move player");
     println!("  - Space: Jump");
+    println!("  - Shift: Sprint (uses stamina)");
     println!("  - Mouse: Control camera");
     println!("  - Mouse Wheel: Zoom in/out");
     println!("  - ESC: Exit game");
     println!("  - 1/2/3: Switch animations");
     println!("  - P: Pause/Resume animation");
     println!("  - Arrow Keys: Control animation playback");
+    println!("  - H: TEST - Take damage");
     
     App::new()
         .add_plugins(DefaultPlugins
@@ -49,7 +53,10 @@ fn main() {
             world::WorldPlugin,
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
-            PhysicsPlugins::default()
+            PhysicsPlugins::default(),
+            // Add new plugins
+            stats::HealthPlugin,      // Health and stamina systems
+            render::HudPlugin,        // UI for health and stamina
         ))
         // Set a dark sky color
         .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))

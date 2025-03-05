@@ -3,6 +3,7 @@ use bevy::{
     input::keyboard::KeyCode,
 };
 use crate::camera::ThirdPersonCamera;
+use crate::stats::health::{Health, Stamina, DamageEvent, DamageType};
 use std::time::Duration;
 
 #[derive(Component)]
@@ -34,14 +35,68 @@ impl Default for Player {
     }
 }
 
+// Player spawn system - adds health and stamina
+fn spawn_player(
+    mut commands: Commands,
+    player_query: Query<Entity, (With<Player>, Without<Health>, Without<Stamina>)>,
+) {
+    for player_entity in player_query.iter() {
+        // Add health and stamina components to player
+        commands.entity(player_entity)
+            .insert(Health::new(100.0))
+            .insert(Stamina::new(100.0));
+    }
+}
+
+// System to handle stamina consumption for actions
+fn player_stamina_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut player_query: Query<(Entity, &mut Stamina, &mut Player)>,
+    time: Res<Time>,
+    mut damage_events: EventWriter<DamageEvent>,
+) {
+    if let Ok((entity, mut stamina, mut player)) = player_query.get_single_mut() {
+        // Sprinting (hold Shift)
+        if keyboard.pressed(KeyCode::ShiftLeft) && player.is_moving {
+            // Consume stamina while sprinting
+            if stamina.use_stamina(20.0 * time.delta().as_secs_f32()) {
+                // Increase speed for sprint
+                player.speed = 8.0;
+            } else {
+                // Not enough stamina, use normal speed
+                player.speed = 5.0;
+            }
+        } else {
+            // Reset to normal speed when not sprinting
+            player.speed = 5.0;
+        }
+        
+        // Jumping (Space) - costs stamina
+        if keyboard.just_pressed(KeyCode::Space) && player.on_ground {
+            // Use stamina for jump
+            stamina.use_stamina(20.0);
+        }
+        
+        // TEST: Press 'H' to damage player (for testing health system)
+        if keyboard.just_pressed(KeyCode::KeyH) {
+            // Send damage event to player
+            damage_events.send(DamageEvent {
+                entity,
+                amount: 10.0,
+                damage_type: DamageType::Physical,
+            });
+        }
+    }
+}
+
 // Player movement system
 fn player_controller(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut player_query: Query<(&mut Player, &mut Transform)>,
+    mut player_query: Query<(&mut Player, &mut Transform, &Stamina)>,
     camera_query: Query<(&Transform, &ThirdPersonCamera), Without<Player>>,
 ) {
-    let dt = time.delta_secs();
+    let dt = time.delta();
     
     // Get camera transform for movement relative to camera view
     let camera_transform = if let Ok((cam_transform, _)) = camera_query.get_single() {
@@ -50,10 +105,10 @@ fn player_controller(
         None
     };
     
-    for (mut player, mut transform) in player_query.iter_mut() {
+    for (mut player, mut transform, stamina) in player_query.iter_mut() {
         // Default to keep existing velocity but apply gravity
         let mut direction = Vec3::ZERO;
-        player.velocity.y -= player.gravity * dt; // Apply gravity
+        player.velocity.y -= player.gravity * dt.as_secs_f32(); // Apply gravity
         
         // Get movement direction based on camera orientation
         if let Some(camera) = camera_transform {
@@ -118,7 +173,7 @@ fn player_controller(
         player.velocity.z = player.velocity.z * 0.8 + target_velocity.z * 0.2;
         
         // Apply velocity to position
-        let mut displacement = player.velocity * dt;
+        let mut displacement = player.velocity * dt.as_secs_f32();
         
         // Simple ground collision
         if player.velocity.y <= 0.0 && transform.translation.y + displacement.y <= player.ground_offset {
@@ -143,20 +198,21 @@ fn player_controller(
             // Smoothly rotate towards the target rotation
             transform.rotation = transform.rotation.slerp(
                 target_rotation, 
-                player.turn_speed * dt
+                player.turn_speed * dt.as_secs_f32()
             );
         }
     }
 }
-
-// Note: Animation control is now handled directly in animation.rs module
 
 // Plugin for player functionality
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, player_controller);
-        // Animation control is now handled in animation.rs
+        app.add_systems(Update, (
+                player_controller,
+                spawn_player,
+                player_stamina_system,
+            ));
     }
 }
