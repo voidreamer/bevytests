@@ -25,7 +25,7 @@ impl Default for Player {
             turn_speed: 5.5,
             gravity: 20.0,
             jump_force: 8.0,
-            ground_offset: 0.8, // Character height/2
+            ground_offset: 0.0, // Character height/2
             on_ground: false,
             velocity: Vec3::ZERO,
             is_moving: false,
