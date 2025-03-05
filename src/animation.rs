@@ -24,9 +24,9 @@ pub fn setup_animations(
     println!("Setting up character animations...");
 
     let (graph, node_indices) = AnimationGraph::from_clips([
-        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
     ]);
     let graph_handle = graphs.add(graph);
     commands.insert_resource(Animations{
@@ -58,7 +58,7 @@ pub fn setup_scene_once_loaded(
     for (entity, mut player) in &mut players {
         let graph = graphs.get(&animations.graph).unwrap();
 
-        let running_animation = get_clip(animations.animations[0], graph, &mut clips);
+        let running_animation = get_clip(animations.animations[1], graph, &mut clips);
         //println!("Running animation: {:?}", running_animation);
         // You can determine the time an event should trigger if you know witch frame it occurs and
         // the frame rate of the animation. Let's say we want to trigger an event at frame 15,
@@ -87,6 +87,7 @@ pub fn keyboard_animation_control(
     animations: Res<Animations>,
     mut current_animation: Local<usize>,
     mut is_moving: Local<bool>,
+    mut is_jumping: Local<bool>,
 ) {
     for (mut player, mut transitions) in &mut animation_players {
         let Some((&playing_animation_index, _)) = player.playing_animations().next() else {
@@ -95,13 +96,27 @@ pub fn keyboard_animation_control(
 
         // Handle running animation with W key
         let was_moving = *is_moving;
+        let was_jumping = *is_jumping;
         
         // Check if W is pressed to trigger running animation
         if keyboard_input.pressed(KeyCode::KeyW) {
+            if was_jumping {
+                continue;
+            }
             *is_moving = true;
+            *is_jumping = false;
             // Only switch if we weren't already moving
             if !was_moving || *current_animation != 2 {
                 *current_animation = 2;
+                transitions
+                    .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                    .repeat();
+            }
+        } else if keyboard_input.just_pressed(KeyCode::Space) {
+            *is_jumping = true;
+            *is_moving = false;
+            if *current_animation != 1 {
+                *current_animation = 1;
                 transitions
                     .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.25))
                     .repeat();
@@ -109,6 +124,7 @@ pub fn keyboard_animation_control(
         } else {
             // Return to idle when W is released
             *is_moving = false;
+            *is_jumping = false;
             if was_moving || (*current_animation != 0 && *current_animation != 1) {
                 *current_animation = 0;
                 transitions

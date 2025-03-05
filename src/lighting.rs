@@ -100,8 +100,10 @@ fn spawn_lighting(
         "models/girly.glb#Scene0")));
 
 
+    /*
     commands.spawn(SceneRoot(asset_server.load(
         "models/scenario.glb#Scene0")));
+    */
 
 }
 
