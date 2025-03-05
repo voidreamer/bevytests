@@ -3,7 +3,6 @@ use bevy::{
     input::keyboard::KeyCode,
 };
 use crate::camera::ThirdPersonCamera;
-use crate::animation::Animations;
 use std::time::Duration;
 
 #[derive(Component)]
