@@ -99,12 +99,6 @@ fn spawn_lighting(
     commands.spawn(SceneRoot(asset_server.load(
         "models/girly.glb#Scene0")));
 
-
-    /*
-    commands.spawn(SceneRoot(asset_server.load(
-        "models/scenario.glb#Scene0")));
-    */
-
 }
 
 pub struct LightingPlugin;

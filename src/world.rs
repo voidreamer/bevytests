@@ -159,6 +159,7 @@ WASD: Move player\n
 Space: Jump\n
 Mouse: Control camera\n
 Mouse Wheel: Zoom in/out\n
+Mouse Left Click: Attack!\n
 ESC: Exit game\n",
     )
     .into()
