@@ -160,6 +160,7 @@ Space: Jump\n
 Mouse: Control camera\n
 Mouse Wheel: Zoom in/out\n
 Mouse Left Click: Attack!\n
+Watch your stamina :P\n
 ESC: Exit game\n",
     )
     .into()

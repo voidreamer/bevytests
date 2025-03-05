@@ -4,18 +4,14 @@ use bevy::{
 };
 use crate::player::Player;
 
-const SOULS_COUNT: usize = 0; // Starting souls count
-
 // UI Resource to track game state
 #[derive(Resource)]
 pub struct GameUI {
-    pub health: f32,         // Current health (0-100)
-    pub max_health: f32,     // Maximum health
-    pub stamina: f32,        // Current stamina (0-100)
-    pub max_stamina: f32,    // Maximum stamina
-    pub souls: usize,        // Soul count (currency)
-    pub equipped_weapon: String, // Currently equipped weapon
-    pub equipped_item: String,   // Currently equipped consumable item
+    pub health: f32,
+    pub max_health: f32,
+    pub stamina: f32,
+    pub max_stamina: f32,
+    pub souls: usize,
 }
 
 impl Default for GameUI {
@@ -25,14 +21,12 @@ impl Default for GameUI {
             max_health: 100.0,
             stamina: 100.0,
             max_stamina: 100.0,
-            souls: SOULS_COUNT,
-            equipped_weapon: "Longsword".to_string(),
-            equipped_item: "Estus Flask".to_string(),
+            souls: 0,
         }
     }
 }
 
-// Components for UI elements
+// UI components
 #[derive(Component)]
 pub struct HealthBar;
 
@@ -42,14 +36,11 @@ pub struct StaminaBar;
 #[derive(Component)]
 pub struct SoulsCounter;
 
-#[derive(Component)]
-pub struct EquipmentDisplay;
-
 // Setup the UI system
 pub fn setup_ui(mut commands: Commands) {
     println!("Setting up UI system...");
     
-    // Root node - covers the entire screen
+    // Root node
     commands
         .spawn((
             Node {
@@ -59,21 +50,21 @@ pub fn setup_ui(mut commands: Commands) {
             },
         ))
         .with_children(|parent| {
-            // Health bar container (bottom left)
+            // Health bar container (top center)
             parent
                 .spawn((
                     Node {
-                        width: Val::Px(300.0),
-                        height: Val::Px(40.0),
+                        width: Val::Px(400.0),
+                        height: Val::Px(30.0),
                         position_type: PositionType::Absolute,
-                        bottom: Val::Px(20.0),
+                        top: Val::Px(20.0),
                         left: Val::Px(20.0),
                         ..default()
                     },
                     BackgroundColor(Color::rgba(0.1, 0.1, 0.1, 0.8)),
                 ))
                 .with_children(|parent| {
-                    // Actual health bar
+                    // Health bar fill
                     parent.spawn((
                         Node {
                             width: Val::Percent(100.0),
@@ -85,21 +76,21 @@ pub fn setup_ui(mut commands: Commands) {
                     ));
                 });
             
-            // Stamina bar container (bottom center-left)
+            // Stamina bar container
             parent
                 .spawn((
                     Node {
                         width: Val::Px(300.0),
-                        height: Val::Px(20.0),
+                        height: Val::Px(15.0),
                         position_type: PositionType::Absolute,
-                        bottom: Val::Px(70.0),
+                        top: Val::Px(60.0),
                         left: Val::Px(20.0),
                         ..default()
                     },
                     BackgroundColor(Color::rgba(0.1, 0.1, 0.1, 0.8)),
                 ))
                 .with_children(|parent| {
-                    // Actual stamina bar
+                    // Stamina bar fill
                     parent.spawn((
                         Node {
                             width: Val::Percent(100.0),
@@ -111,13 +102,13 @@ pub fn setup_ui(mut commands: Commands) {
                     ));
                 });
                 
-            // Souls counter (bottom right)
+            // Souls counter
             parent.spawn((
                 Node {
                     width: Val::Px(150.0),
                     height: Val::Px(40.0),
                     position_type: PositionType::Absolute,
-                    bottom: Val::Px(20.0),
+                    top: Val::Px(20.0),
                     right: Val::Px(20.0),
                     display: Display::Flex,
                     justify_content: JustifyContent::Center,
@@ -126,90 +117,9 @@ pub fn setup_ui(mut commands: Commands) {
                 },
                 BackgroundColor(Color::rgba(0.1, 0.1, 0.1, 0.8)),
                 SoulsCounter,
-                Text::new("Souls: 0"),
+                Text::new("Azurite: 0"),
                 TextColor(Color::rgb(0.9, 0.8, 0.4)),
             ));
-                
-            // Equipment slots (bottom right, above souls counter)
-            parent.spawn((
-                Node {
-                    width: Val::Px(200.0),
-                    height: Val::Px(100.0),
-                    position_type: PositionType::Absolute,
-                    bottom: Val::Px(70.0),
-                    right: Val::Px(20.0),
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::SpaceEvenly,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BackgroundColor(Color::rgba(0.1, 0.1, 0.1, 0.6)),
-                EquipmentDisplay,
-            ))
-            .with_children(|parent| {
-                // Weapon slot
-                parent.spawn((
-                    Node {
-                        width: Val::Px(180.0),
-                        height: Val::Px(40.0),
-                        display: Display::Flex,
-                        justify_content: JustifyContent::SpaceBetween,
-                        align_items: AlignItems::Center,
-                        padding: UiRect::horizontal(Val::Px(10.0)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::rgba(0.2, 0.2, 0.2, 0.8)),
-                ))
-                .with_children(|parent| {
-                    // Weapon icon placeholder
-                    parent.spawn((
-                        Node {
-                            width: Val::Px(30.0),
-                            height: Val::Px(30.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::rgb(0.7, 0.7, 0.7)),
-                    ));
-                    
-                    // Weapon name
-                    parent.spawn((
-                        Text::new("Longsword"),
-                        TextColor(Color::WHITE),
-                    ));
-                });
-                
-                // Item slot
-                parent.spawn((
-                    Node {
-                        width: Val::Px(180.0),
-                        height: Val::Px(40.0),
-                        display: Display::Flex,
-                        justify_content: JustifyContent::SpaceBetween,
-                        align_items: AlignItems::Center,
-                        padding: UiRect::horizontal(Val::Px(10.0)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::rgba(0.2, 0.2, 0.2, 0.8)),
-                ))
-                .with_children(|parent| {
-                    // Item icon placeholder
-                    parent.spawn((
-                        Node {
-                            width: Val::Px(30.0),
-                            height: Val::Px(30.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::rgb(0.2, 0.8, 0.5)),
-                    ));
-                    
-                    // Item name
-                    parent.spawn((
-                        Text::new("Estus Flask"),
-                        TextColor(Color::WHITE),
-                    ));
-                });
-            });
         });
 
     // Initialize the UI resource

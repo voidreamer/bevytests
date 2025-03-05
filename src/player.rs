@@ -24,6 +24,8 @@ pub struct Player {
     pub max_stamina: f32,
     pub stamina_regen_rate: f32,
     pub stamina_use_rate: f32,
+    pub exhausted: bool,       // Flag for when stamina is depleted
+    pub exhaustion_timer: f32, // Time before stamina starts regenerating
 }
 
 impl Default for Player {
@@ -46,6 +48,8 @@ impl Default for Player {
             max_stamina: 100.0,
             stamina_regen_rate: 15.0, // Stamina gained per second when not using
             stamina_use_rate: 25.0,   // Stamina used per second when running
+            exhausted: false,
+            exhaustion_timer: 0.0,
         }
     }
 }
@@ -70,6 +74,33 @@ fn player_controller(
         // Default to keep existing velocity but apply gravity
         let mut direction = Vec3::ZERO;
         player.velocity.y -= player.gravity * dt; // Apply gravity
+        
+        // Handle exhaustion recovery timer
+        if player.exhausted {
+            player.exhaustion_timer -= dt;
+            if player.exhaustion_timer <= 0.0 {
+                player.exhausted = false;
+            }
+        }
+        
+        // Handle stamina regeneration/depletion
+        if player.is_moving {
+            // Use stamina while moving
+            player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
+            
+            // Check if we've reached exhaustion
+            if player.stamina <= 0.1 && !player.exhausted {
+                player.exhausted = true;
+                player.exhaustion_timer = 2.0; // 2 seconds of exhaustion
+                // Could play a heavy breathing or fatigue sound here
+            }
+        } else if !player.exhausted {
+            // Regenerate stamina when not moving and not exhausted
+            player.stamina = (player.stamina + player.stamina_regen_rate * dt).min(player.max_stamina);
+        } else if !player.is_moving {
+            // Slower regeneration when exhausted but not moving
+            player.stamina = (player.stamina + player.stamina_regen_rate * 0.3 * dt).min(player.max_stamina);
+        }
         
         // Get movement direction based on camera orientation
         if let Some(camera) = camera_transform {
@@ -111,8 +142,8 @@ fn player_controller(
             }
         }
         
-        // Jump when on ground and space pressed
-        if player.on_ground && keyboard.just_pressed(KeyCode::Space) {
+        // Jump when on ground and space pressed - require minimum stamina
+        if player.on_ground && keyboard.just_pressed(KeyCode::Space) && player.stamina >= 20.0 {
             player.velocity.y = player.jump_force;
             player.on_ground = false;
             
@@ -124,27 +155,40 @@ fn player_controller(
         let is_moving = direction.length_squared() > 0.001;
         player.is_moving = is_moving;
         
-        // Handle stamina regeneration/usage
-        if is_moving && player.stamina > 0.0 {
-            // Use stamina while moving
-            player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
-        } else if !is_moving {
-            // Regenerate stamina when not moving
-            player.stamina = (player.stamina + player.stamina_regen_rate * dt).min(player.max_stamina);
-        }
-        
         // Normalize horizontal movement if needed
         if is_moving {
             direction = direction.normalize();
         }
         
-        // Apply movement with appropriate speed - reduce speed if low stamina
-        let speed_modifier = if player.stamina < 20.0 { 0.6 } else { 1.0 };
+        // Apply movement with appropriate speed - more dramatic stamina effects
+        let mut speed_modifier = 1.0;
+        
+        // Reduce speed based on stamina level
+        if player.stamina < 20.0 {
+            // Progressively slower as stamina depletes
+            speed_modifier = 0.6 + (player.stamina / 20.0) * 0.4;
+        }
+        
+        // When exhausted, severely limit movement speed
+        if player.exhausted {
+            speed_modifier = 0.3; // Very slow when exhausted
+        }
+        
         let target_velocity = direction * player.speed * speed_modifier;
         
+        // Responsiveness is also affected by stamina
+        let blend_factor = if player.exhausted {
+            0.6 // More sluggish controls when exhausted
+        } else if player.stamina < 30.0 {
+            0.7 + (player.stamina / 30.0) * 0.2
+        } else {
+            0.8 // Normal responsiveness
+        };
+        
         // Smoothly blend horizontal velocity (XZ only) for more natural movement
-        player.velocity.x = player.velocity.x * 0.8 + target_velocity.x * 0.2;
-        player.velocity.z = player.velocity.z * 0.8 + target_velocity.z * 0.2;
+        // Uses dynamic blend factor based on stamina
+        player.velocity.x = player.velocity.x * blend_factor + target_velocity.x * (1.0 - blend_factor);
+        player.velocity.z = player.velocity.z * blend_factor + target_velocity.z * (1.0 - blend_factor);
         
         // Apply velocity to position
         let mut displacement = player.velocity * dt;
@@ -169,24 +213,32 @@ fn player_controller(
                 direction.normalize()
             );
             
+            // Rotation speed is also affected by stamina
+            let rotation_speed = if player.exhausted {
+                player.turn_speed * 0.5
+            } else {
+                player.turn_speed
+            };
+            
             // Smoothly rotate towards the target rotation
             transform.rotation = transform.rotation.slerp(
                 target_rotation, 
-                player.turn_speed * dt
+                rotation_speed * dt
             );
         }
     }
 }
 
-// Add a system to sync player stats with the UI
+// Debug system for health regeneration over time
 fn update_player_stats(
     mut player_query: Query<&mut Player>,
     time: Res<Time>,
 ) {
     for mut player in &mut player_query {
-        // Additional player stat logic could go here
-        // For example, health regeneration over time
-        // player.health = (player.health + 1.0 * time.delta_secs()).min(player.max_health);
+        // Very slow natural health regeneration - only when not exhausted
+        if !player.exhausted && player.health < player.max_health {
+            player.health = (player.health + 0.5 * time.delta_secs()).min(player.max_health);
+        }
     }
 }
 
