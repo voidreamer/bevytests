@@ -7,6 +7,7 @@ use bevy::{
     },
     animation::{AnimationTargetId, RepeatAnimation},
 };
+use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
 
@@ -91,6 +92,7 @@ pub fn keyboard_animation_control(
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<Animations>,
+    mut player_query: Query<&mut Player>,
     mut current_animation: Local<usize>,
     mut is_moving: Local<bool>,
     mut is_jumping: Local<bool>,
@@ -108,8 +110,15 @@ pub fn keyboard_animation_control(
         *jump_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
     }
 
-    for (mut player, mut transitions) in &mut animation_players {
-        let Some((&playing_animation_index, _)) = player.playing_animations().next() else {
+    // Get player reference
+    let mut player = if let Ok(p) = player_query.get_single_mut() {
+        p
+    } else {
+        return;
+    };
+
+    for (mut anim_player, mut transitions) in &mut animation_players {
+        let Some((&playing_animation_index, _)) = anim_player.playing_animations().next() else {
             continue;
         };
 
@@ -123,7 +132,7 @@ pub fn keyboard_animation_control(
                     *is_attacking = false;
                     *current_animation = 0;
                     transitions
-                        .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
                         .repeat();
                 }
                 
@@ -146,13 +155,13 @@ pub fn keyboard_animation_control(
                         *is_moving = true;
                         *current_animation = 3;
                         transitions
-                            .play(&mut player, animations.animations[3], Duration::from_secs_f32(0.25))
+                            .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25))
                             .repeat();
                     } else {
                         *is_moving = false;
                         *current_animation = 0;
                         transitions
-                            .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                            .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
                             .repeat();
                     }
                 }
@@ -169,9 +178,12 @@ pub fn keyboard_animation_control(
             *is_jumping = false;
             *current_animation = 4;
             
+            // Use stamina for attack
+            player.stamina = (player.stamina - 15.0).max(0.0);
+            
             // Start the attack animation and set the timer
             transitions
-                .play(&mut player, animations.animations[4], Duration::from_secs_f32(0.25));
+                .play(&mut anim_player, animations.animations[4], Duration::from_secs_f32(0.25));
             
             if let Some(timer) = attack_timer.as_mut() {
                 // Set timer for the attack animation's duration
@@ -188,19 +200,22 @@ pub fn keyboard_animation_control(
             
             // Check for Space key (jump) - this now takes priority over running
             if keyboard_input.just_pressed(KeyCode::Space) {
-                *is_jumping = true;
-                *current_animation = 2;
-                
-                // Play jump animation
-                transitions
-                    .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.25))
-                    .repeat();
-                
-                // Set jump timer
-                if let Some(timer) = jump_timer.as_mut() {
-                    // Set jump animation duration - adjust as needed
-                    timer.set_duration(Duration::from_secs_f32(1.0)); 
-                    timer.reset();
+                // Only jump if we have enough stamina
+                if player.stamina >= 20.0 {
+                    *is_jumping = true;
+                    *current_animation = 2;
+                    
+                    // Play jump animation
+                    transitions
+                        .play(&mut anim_player, animations.animations[2], Duration::from_secs_f32(0.25))
+                        .repeat();
+                    
+                    // Set jump timer
+                    if let Some(timer) = jump_timer.as_mut() {
+                        // Set jump animation duration - adjust as needed
+                        timer.set_duration(Duration::from_secs_f32(1.0)); 
+                        timer.reset();
+                    }
                 }
                 
                 continue;
@@ -213,7 +228,7 @@ pub fn keyboard_animation_control(
                 if !was_moving || *current_animation != 3 {
                     *current_animation = 3;
                     transitions
-                        .play(&mut player, animations.animations[3], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25))
                         .repeat();
                 }
             } else {
@@ -222,7 +237,7 @@ pub fn keyboard_animation_control(
                 if was_moving || (*current_animation != 0 && *current_animation != 1) {
                     *current_animation = 0;
                     transitions
-                        .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
                         .repeat();
                 }
             }

@@ -16,6 +16,14 @@ pub struct Player {
     pub velocity: Vec3,
     pub is_moving: bool,
     pub current_animation: u8, // 0: idle, 1: tpose, 2: running
+    
+    // Added for UI
+    pub health: f32,
+    pub max_health: f32,
+    pub stamina: f32,
+    pub max_stamina: f32,
+    pub stamina_regen_rate: f32,
+    pub stamina_use_rate: f32,
 }
 
 impl Default for Player {
@@ -30,6 +38,14 @@ impl Default for Player {
             velocity: Vec3::ZERO,
             is_moving: false,
             current_animation: 1, // Start with idle animation
+            
+            // Stats for UI
+            health: 100.0,
+            max_health: 100.0,
+            stamina: 100.0,
+            max_stamina: 100.0,
+            stamina_regen_rate: 15.0, // Stamina gained per second when not using
+            stamina_use_rate: 25.0,   // Stamina used per second when running
         }
     }
 }
@@ -99,19 +115,32 @@ fn player_controller(
         if player.on_ground && keyboard.just_pressed(KeyCode::Space) {
             player.velocity.y = player.jump_force;
             player.on_ground = false;
+            
+            // Jumping uses stamina
+            player.stamina = (player.stamina - 20.0).max(0.0);
         }
         
         // Check if player is moving horizontally
         let is_moving = direction.length_squared() > 0.001;
         player.is_moving = is_moving;
         
+        // Handle stamina regeneration/usage
+        if is_moving && player.stamina > 0.0 {
+            // Use stamina while moving
+            player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
+        } else if !is_moving {
+            // Regenerate stamina when not moving
+            player.stamina = (player.stamina + player.stamina_regen_rate * dt).min(player.max_stamina);
+        }
+        
         // Normalize horizontal movement if needed
         if is_moving {
             direction = direction.normalize();
         }
         
-        // Apply movement with appropriate speed
-        let target_velocity = direction * player.speed;
+        // Apply movement with appropriate speed - reduce speed if low stamina
+        let speed_modifier = if player.stamina < 20.0 { 0.6 } else { 1.0 };
+        let target_velocity = direction * player.speed * speed_modifier;
         
         // Smoothly blend horizontal velocity (XZ only) for more natural movement
         player.velocity.x = player.velocity.x * 0.8 + target_velocity.x * 0.2;
@@ -149,14 +178,24 @@ fn player_controller(
     }
 }
 
-// Note: Animation control is now handled directly in animation.rs module
+// Add a system to sync player stats with the UI
+fn update_player_stats(
+    mut player_query: Query<&mut Player>,
+    time: Res<Time>,
+) {
+    for mut player in &mut player_query {
+        // Additional player stat logic could go here
+        // For example, health regeneration over time
+        // player.health = (player.health + 1.0 * time.delta_secs()).min(player.max_health);
+    }
+}
 
 // Plugin for player functionality
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, player_controller);
+        app.add_systems(Update, (player_controller, update_player_stats));
         // Animation control is now handled in animation.rs
     }
 }

@@ -10,6 +10,7 @@ mod camera;
 mod world;
 mod lighting;
 mod animation;
+mod ui;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -22,6 +23,8 @@ fn main() {
     println!("  - 1/2/3: Switch animations");
     println!("  - P: Pause/Resume animation");
     println!("  - Arrow Keys: Control animation playback");
+    println!("  - H/J: Decrease/Increase health");
+    println!("  - S: Add souls (100)");
     
     App::new()
         .add_plugins(DefaultPlugins
@@ -49,6 +52,7 @@ fn main() {
             world::WorldPlugin,
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
+            ui::UIPlugin,
             PhysicsPlugins::default()
         ))
         // Set a dark sky color
