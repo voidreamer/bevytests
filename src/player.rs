@@ -24,12 +24,12 @@ impl Default for Player {
             speed: 5.0,
             turn_speed: 5.5,
             gravity: 20.0,
-            jump_force: 8.0,
-            ground_offset: 0.0, // Character height/2
+            jump_force: 7.0,
+            ground_offset: 0.0, 
             on_ground: false,
             velocity: Vec3::ZERO,
             is_moving: false,
-            current_animation: 0, // Start with idle animation
+            current_animation: 1, // Start with idle animation
         }
     }
 }

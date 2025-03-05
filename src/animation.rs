@@ -1,7 +1,10 @@
 use std::time::Duration;
 use bevy::{
     prelude::*,
-    input::keyboard::KeyCode,
+    input::{
+        mouse::{MouseMotion, MouseWheel, MouseButton},
+        keyboard::KeyCode,
+    },
     animation::{AnimationTargetId, RepeatAnimation},
 };
 
@@ -24,9 +27,11 @@ pub fn setup_animations(
     println!("Setting up character animations...");
 
     let (graph, node_indices) = AnimationGraph::from_clips([
+        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(4).from_asset(CHARACTER_PATH)),
     ]);
     let graph_handle = graphs.add(graph);
     commands.insert_resource(Animations{
@@ -71,7 +76,7 @@ pub fn setup_scene_once_loaded(
         // the animations and will get confused if the animations are started
         // directly via the `AnimationPlayer`.
         transitions
-            .play(&mut player, animations.animations[0], Duration::ZERO)
+            .play(&mut player, animations.animations[1], Duration::ZERO)
             .repeat();
 
         commands
@@ -83,6 +88,7 @@ pub fn setup_scene_once_loaded(
 
 pub fn keyboard_animation_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<Animations>,
     mut current_animation: Local<usize>,
@@ -109,7 +115,7 @@ pub fn keyboard_animation_control(
             if !was_moving || *current_animation != 2 {
                 *current_animation = 2;
                 transitions
-                    .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                    .play(&mut player, animations.animations[3], Duration::from_secs_f32(0.25))
                     .repeat();
             }
         } else if keyboard_input.just_pressed(KeyCode::Space) {
@@ -128,9 +134,15 @@ pub fn keyboard_animation_control(
             if was_moving || (*current_animation != 0 && *current_animation != 1) {
                 *current_animation = 0;
                 transitions
-                    .play(&mut player, animations.animations[0], Duration::from_secs_f32(0.25))
+                    .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
                     .repeat();
             }
+        }
+
+        if mouse_button_input.pressed(MouseButton::Left) {
+            *current_animation = 4;
+            transitions
+                .play(&mut player, animations.animations[4], Duration::from_secs_f32(5.0));
         }
         
         // Manual animation override for T-pose
