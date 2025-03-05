@@ -94,108 +94,99 @@ pub fn keyboard_animation_control(
     mut current_animation: Local<usize>,
     mut is_moving: Local<bool>,
     mut is_jumping: Local<bool>,
+    mut is_attacking: Local<bool>,
+    mut attack_timer: Local<Option<Timer>>,
 ) {
+    // Initialize the attack timer if it's None
+    if attack_timer.is_none() {
+        *attack_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
+    }
+
     for (mut player, mut transitions) in &mut animation_players {
         let Some((&playing_animation_index, _)) = player.playing_animations().next() else {
             continue;
         };
 
-        // Handle running animation with W key
-        let was_moving = *is_moving;
-        let was_jumping = *is_jumping;
-        
-        // Check if W is pressed to trigger running animation
-        if keyboard_input.pressed(KeyCode::KeyW) {
-            if was_jumping {
+        // Update attack timer if we're attacking
+        if *is_attacking {
+            if let Some(timer) = attack_timer.as_mut() {
+                timer.tick(Duration::from_secs_f32(0.016)); // Roughly one frame at 60fps
+                
+                // If attack animation is complete, return to idle
+                if timer.finished() {
+                    *is_attacking = false;
+                    *current_animation = 0;
+                    transitions
+                        .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .repeat();
+                }
+                
+                // Skip other animation checks while attacking
                 continue;
             }
-            *is_moving = true;
-            *is_jumping = false;
-            // Only switch if we weren't already moving
-            if !was_moving || *current_animation != 2 {
-                *current_animation = 2;
-                transitions
-                    .play(&mut player, animations.animations[3], Duration::from_secs_f32(0.25))
-                    .repeat();
-            }
-        } else if keyboard_input.just_pressed(KeyCode::Space) {
-            *is_jumping = true;
-            *is_moving = false;
-            if *current_animation != 1 {
-                *current_animation = 1;
-                transitions
-                    .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.25))
-                    .repeat();
-            }
-        } else {
-            // Return to idle when W is released
-            *is_moving = false;
-            *is_jumping = false;
-            if was_moving || (*current_animation != 0 && *current_animation != 1) {
-                *current_animation = 0;
-                transitions
-                    .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
-                    .repeat();
-            }
         }
 
-        if mouse_button_input.pressed(MouseButton::Left) {
+        // Handle attack animation with left mouse button
+        if mouse_button_input.just_pressed(MouseButton::Left) && !*is_attacking {
+            *is_attacking = true;
+            *is_moving = false;
+            *is_jumping = false;
             *current_animation = 4;
+            
+            // Start the attack animation and set the timer
             transitions
-                .play(&mut player, animations.animations[4], Duration::from_secs_f32(5.0));
-        }
-        
-        // Manual animation override for T-pose
-        if keyboard_input.just_pressed(KeyCode::Digit2) {
-            *current_animation = 1;
-            transitions
-                .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
-                .repeat();
-        }
-        
-        // Manually go back to idle
-        if keyboard_input.just_pressed(KeyCode::Digit1) {
-            *current_animation = 0;
-            transitions
-                .play(&mut player, animations.animations[0], Duration::from_secs_f32(0.25))
-                .repeat();
+                .play(&mut player, animations.animations[4], Duration::from_secs_f32(0.25));
+            
+            if let Some(timer) = attack_timer.as_mut() {
+                // Set timer for the attack animation's duration (adjust this value based on your actual animation length)
+                timer.set_duration(Duration::from_secs_f32(1.5));
+                timer.reset();
+            }
+            
+            continue; // Skip other animation checks
         }
 
-        // Pause/Resume animation
-        if keyboard_input.just_pressed(KeyCode::KeyP) {
-            let playing_animation = player.animation_mut(playing_animation_index).unwrap();
-            if playing_animation.is_paused() {
-                playing_animation.resume();
+        // Only process other animations if we're not attacking
+        if !*is_attacking {
+            let was_moving = *is_moving;
+            let was_jumping = *is_jumping;
+            
+            // Check if W is pressed to trigger running animation
+            if keyboard_input.pressed(KeyCode::KeyW) {
+                if was_jumping {
+                    continue;
+                }
+                *is_moving = true;
+                *is_jumping = false;
+                // Only switch if we weren't already moving
+                if !was_moving || *current_animation != 3 {
+                    *current_animation = 3;
+                    transitions
+                        .play(&mut player, animations.animations[3], Duration::from_secs_f32(0.25))
+                        .repeat();
+                }
+            } else if keyboard_input.just_pressed(KeyCode::Space) {
+                *is_jumping = true;
+                *is_moving = false;
+                if *current_animation != 2 {
+                    *current_animation = 2;
+                    transitions
+                        .play(&mut player, animations.animations[2], Duration::from_secs_f32(0.25))
+                        .repeat();
+                }
             } else {
-                playing_animation.pause();
+                // Return to idle when W is released
+                *is_moving = false;
+                *is_jumping = false;
+                if was_moving || (*current_animation != 0 && *current_animation != 1) {
+                    *current_animation = 0;
+                    transitions
+                        .play(&mut player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .repeat();
+                }
             }
         }
 
-        // Speed controls
-        if keyboard_input.just_pressed(KeyCode::ArrowUp) {
-            let playing_animation = player.animation_mut(playing_animation_index).unwrap();
-            let speed = playing_animation.speed();
-            playing_animation.set_speed(speed * 1.2);
-        }
-
-        if keyboard_input.just_pressed(KeyCode::ArrowDown) {
-            let playing_animation = player.animation_mut(playing_animation_index).unwrap();
-            let speed = playing_animation.speed();
-            playing_animation.set_speed(speed * 0.8);
-        }
-
-        // Seek controls
-        if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
-            let playing_animation = player.animation_mut(playing_animation_index).unwrap();
-            let elapsed = playing_animation.seek_time();
-            playing_animation.seek_to(elapsed - 0.1);
-        }
-
-        if keyboard_input.just_pressed(KeyCode::ArrowRight) {
-            let playing_animation = player.animation_mut(playing_animation_index).unwrap();
-            let elapsed = playing_animation.seek_time();
-            playing_animation.seek_to(elapsed + 0.1);
-        }
     }
 }
 
