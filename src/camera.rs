@@ -2,7 +2,7 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
     input::{
-        mouse::{MouseMotion, MouseWheel, MouseButton},
+        mouse::{MouseMotion, MouseWheel},
         keyboard::KeyCode,
     },
     core_pipeline::bloom::Bloom,

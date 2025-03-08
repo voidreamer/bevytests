@@ -3,7 +3,6 @@ use bevy::{
     input::keyboard::KeyCode,
 };
 use crate::camera::ThirdPersonCamera;
-use std::time::Duration;
 
 #[derive(Component)]
 pub struct Player {
@@ -15,7 +14,6 @@ pub struct Player {
     pub on_ground: bool,
     pub velocity: Vec3,
     pub is_moving: bool,
-    pub current_animation: u8, // 0: idle, 1: tpose, 2: running
     
     // Added for UI
     pub health: f32,
@@ -39,7 +37,6 @@ impl Default for Player {
             on_ground: false,
             velocity: Vec3::ZERO,
             is_moving: false,
-            current_animation: 1, // Start with idle animation
             
             // Stats for UI
             health: 100.0,

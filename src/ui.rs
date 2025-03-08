@@ -116,7 +116,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.5)),
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
                     ));
                 });
                 
@@ -127,7 +127,7 @@ pub fn setup_ui(mut commands: Commands) {
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    BackgroundColor(Color::rgba(0.3, 0.0, 0.0, 0.7)),
+                    BackgroundColor(Color::srgba(0.3, 0.0, 0.0, 0.7)),
                     HealthBarBg,
                 ))
                 .with_children(|parent| {
@@ -138,7 +138,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgb(255.0, 0.0, 0.0)),
+                        BackgroundColor(Color::srgb(255.0, 0.0, 0.0)),
                         HealthBar,
                     ));
                     
@@ -152,7 +152,7 @@ pub fn setup_ui(mut commands: Commands) {
                                 left: Val::Percent(i as f32 * 5.0),
                                 ..default()
                             },
-                            BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.2)),
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.2)),
                         ));
                     }
                 });
@@ -189,7 +189,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.5)),
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
                     ));
                 });
                 
@@ -200,7 +200,7 @@ pub fn setup_ui(mut commands: Commands) {
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    BackgroundColor(Color::rgba(0.0, 0.3, 0.0, 0.7)),
+                    BackgroundColor(Color::srgba(0.0, 0.3, 0.0, 0.7)),
                 ))
                 .with_children(|parent| {
                     // Stamina bar fill
@@ -210,7 +210,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgb(0.2, 0.8, 0.2)),
+                        BackgroundColor(Color::srgb(0.2, 0.8, 0.2)),
                         StaminaBar,
                     ));
                     
@@ -221,7 +221,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgba(1.0, 1.0, 1.0, 0.5)),
+                        BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.5)),
                         StaminaFlash,
                     ));
                     
@@ -235,7 +235,7 @@ pub fn setup_ui(mut commands: Commands) {
                                 left: Val::Percent(i as f32 * 5.0),
                                 ..default()
                             },
-                            BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.2)),
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.2)),
                         ));
                     }
                 });
@@ -268,7 +268,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.5)),
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
                     ));
                 });
                 
@@ -279,7 +279,7 @@ pub fn setup_ui(mut commands: Commands) {
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    BackgroundColor(Color::rgba(0.0, 0.0, 0.3, 0.7)),
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.3, 0.7)),
                 ))
                 .with_children(|parent| {
                     // Shield bar fill
@@ -289,7 +289,7 @@ pub fn setup_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::rgb(0.3, 0.3, 0.9)),
+                        BackgroundColor(Color::srgb(0.3, 0.3, 0.9)),
                         ShieldBar,
                     ));
                     
@@ -303,7 +303,7 @@ pub fn setup_ui(mut commands: Commands) {
                                 left: Val::Percent(i as f32 * 5.0),
                                 ..default()
                             },
-                            BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.2)),
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.2)),
                         ));
                     }
                 });
@@ -325,7 +325,7 @@ pub fn setup_ui(mut commands: Commands) {
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
-            BackgroundColor(Color::rgba(0.1, 0.1, 0.1, 0.7)),
+            BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.7)),
             SoulsCounter,
         ))
         .with_children(|parent| {
@@ -347,7 +347,7 @@ pub fn setup_ui(mut commands: Commands) {
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.5)),
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
                 ));
             });
             
@@ -371,14 +371,14 @@ pub fn setup_ui(mut commands: Commands) {
                         border: UiRect::all(Val::Px(2.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::rgba(0.9, 0.8, 0.2, 0.9)),
+                    BackgroundColor(Color::srgba(0.9, 0.8, 0.2, 0.9)),
                 ));
             });
             
             // Souls count text - we'll add the SoulsText marker component here
             parent.spawn((
                 Text::new("0"),
-                TextColor(Color::rgba(0.9, 0.8, 0.3, 1.0)),
+                TextColor(Color::srgba(0.9, 0.8, 0.3, 1.0)),
                 SoulsText, // This marker component will help us target the text
             ));
         });
@@ -448,11 +448,11 @@ pub fn update_health_bar(
         
         if time_since_damage < damage_flash_time {
             // Red pulsating effect when damaged
-            let flash_intensity = (1.0 - time_since_damage / damage_flash_time);
-            bg_color.0 = Color::rgba(0.4 + flash_intensity * 0.3, 0.0, 0.0, 0.7);
+            let flash_intensity = 1.0 - time_since_damage / damage_flash_time;
+            bg_color.0 = Color::srgba(0.4 + flash_intensity * 0.3, 0.0, 0.0, 0.7);
         } else {
             // Normal dark red background
-            bg_color.0 = Color::rgba(0.3, 0.0, 0.0, 0.7);
+            bg_color.0 = Color::srgba(0.3, 0.0, 0.0, 0.7);
         }
     }
 }
@@ -487,7 +487,7 @@ pub fn update_stamina_flash(
             
             // Fade out
             let alpha = 0.5 * (1.0 - time_since_usage / usage_flash_time);
-            flash_color.0 = Color::rgba(1.0, 1.0, 1.0, alpha);
+            flash_color.0 = Color::srgba(1.0, 1.0, 1.0, alpha);
         } else {
             // Hide effect when not active
             flash_node.width = Val::Percent(0.0);
@@ -530,10 +530,10 @@ pub fn animate_health_bar(
         if health_percent < 0.3 {
             // Critical health - pulsating red
             let pulse = (t * 3.0).sin() * 0.5 + 0.5;
-            color.0 = Color::rgb(0.9, 0.1 + pulse * 0.1, 0.1 + pulse * 0.1);
+            color.0 = Color::srgb(0.9, 0.1 + pulse * 0.1, 0.1 + pulse * 0.1);
         } else {
             // Normal health - gradient from red to yellow-red based on health
-            color.0 = Color::rgb(0.9, 0.2 , 0.2);
+            color.0 = Color::srgb(0.9, 0.2 , 0.2);
         }
     }
 }
@@ -553,10 +553,10 @@ pub fn animate_shield_bar(
         
         if shield_percent < 0.3 {
             // Low shield - purple-ish
-            color.0 = Color::rgb(0.5 * pulse, 0.2 * pulse, 0.8 * pulse);
+            color.0 = Color::srgb(0.5 * pulse, 0.2 * pulse, 0.8 * pulse);
         } else {
             // Normal shield - blue
-            color.0 = Color::rgb(0.2 * pulse, 0.3 * pulse, 0.9 * pulse);
+            color.0 = Color::srgb(0.2 * pulse, 0.3 * pulse, 0.9 * pulse);
         }
     }
 }

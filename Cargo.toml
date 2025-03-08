@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 bevy = {version = "0.15", features=["jpeg"]}
-avian3d = "0.2"
+bevy_rapier3d = { version = "0.29.0", features = ["simd-stable", "debug-render-3d"]}
 bevy_ui = "0.15.3"
 
 [dependencies.gltf]

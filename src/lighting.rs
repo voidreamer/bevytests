@@ -42,7 +42,7 @@ fn animate_lights(
 // Spawn lighting for the scene
 fn spawn_lighting(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    // asset_server: Res<AssetServer>,
 ) {
     // Main directional light with cascaded shadow maps for sun
     let cascade_shadow_config = CascadeShadowConfigBuilder {
@@ -96,8 +96,10 @@ fn spawn_lighting(
         AnimatedLight::default(),
     ));
 
+    /*
     commands.spawn(SceneRoot(asset_server.load(
         "models/girly.glb#Scene0")));
+    */
 
 }
 

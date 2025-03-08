@@ -2,7 +2,7 @@ use bevy::{
     prelude::*,
     // pbr::FogVolume,
 };
-use avian3d::prelude::*; // Add Avian3D prelude for physics components
+use bevy_rapier3d::prelude::*;
 use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
@@ -32,8 +32,6 @@ pub fn spawn_scene(
     let _ground_mesh = meshes.add(Plane3d::default().mesh().size(ground_size, ground_size));
     
     commands.spawn((
-        RigidBody::Static,           
-        Collider::cuboid(ground_size, 0.01, ground_size), 
         Mesh3d(_ground_mesh), 
         MeshMaterial3d(_ground_material), 
     ));
@@ -43,8 +41,6 @@ pub fn spawn_scene(
     // ==============================================
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
-        RigidBody::Kinematic,        
-        Collider::capsule(0.4, 2.0), 
         Player::default(),
     ));
     
@@ -77,8 +73,6 @@ pub fn spawn_scene(
         let z = angle.cos() * distance;
         
         commands.spawn((
-            RigidBody::Static,
-            Collider::cylinder(0.7, 6.0), 
             Mesh3d(pillar_mesh.clone()),
             MeshMaterial3d(pillar_material.clone()),
             Transform::from_xyz(x, 3.0, z),
@@ -101,13 +95,19 @@ pub fn spawn_scene(
         let z = angle.cos() * distance;
         
         commands.spawn((
-            RigidBody::Dynamic,        
-            Collider::cuboid(1.5, 1.0, 1.5), 
-            AngularVelocity(Vec3::new(2.5, 3.5, 1.5)),
-            Mesh3d(meshes.add(Cuboid::from_length(1.0))),
+            Mesh3d(meshes.add(Cuboid::from_length(2.0))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(x, 5.5, z),
-        ));
+        ))
+        .insert(RigidBody::Dynamic)
+        .insert(Velocity{
+            linvel: Vec3::new(0.0, 2.0, 0.0),
+            angvel: Vec3::new(0.2, 0.0, 0.0),
+        })
+        .insert(Collider::cuboid(1.0, 1.0, 1.0))
+        .insert(GravityScale(2.0))
+        .insert(Ccd::enabled())
+        .insert(Restitution::coefficient(0.2));
     }
     
     // Add some decorative objects (dynamic spheres)
@@ -131,11 +131,26 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
-            RigidBody::Dynamic,        
-            Collider::sphere(0.8), 
         ));
     }
 }
+
+// ==============================================
+// Physics setup
+// ==============================================
+
+fn setup_physics(mut commands: Commands) {
+    commands
+        .spawn(Collider::cuboid(100.0, 0.1, 100.0))
+        .insert(Transform::from_xyz(0.0, -0.1, 0.0));
+
+    commands
+        .spawn(RigidBody::Dynamic)
+        .insert(Collider::ball(0.5))
+        .insert(Transform::from_xyz(0.0, 5.0, 0.0))
+        .insert(Restitution::coefficient(0.7));
+}
+
 
 // ==============================================
 // Some simple UI text 
@@ -175,6 +190,9 @@ pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-           .add_systems(Startup, spawn_scene);
+            .add_systems(Startup, spawn_scene)
+            .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())        
+            .add_plugins(RapierDebugRenderPlugin::default())
+            .add_systems(Startup, setup_physics);
     }
 }

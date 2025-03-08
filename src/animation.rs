@@ -2,10 +2,9 @@ use std::time::Duration;
 use bevy::{
     prelude::*,
     input::{
-        mouse::{MouseMotion, MouseWheel, MouseButton},
+        mouse::MouseButton,
         keyboard::KeyCode,
     },
-    animation::{AnimationTargetId, RepeatAnimation},
 };
 use crate::player::Player;
 
@@ -44,34 +43,10 @@ pub fn setup_animations(
 pub fn setup_scene_once_loaded(
     mut commands: Commands,
     animations: Res<Animations>,
-    graphs: Res<Assets<AnimationGraph>>,
-    mut clips: ResMut<Assets<AnimationClip>>,
     mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
 ) {
-    fn get_clip<'a>(
-        node: AnimationNodeIndex,
-        graph: &AnimationGraph,
-        clips: &'a mut Assets<AnimationClip>,
-    ) -> &'a mut AnimationClip {
-        let node = graph.get(node).unwrap();
-        let clip = match &node.node_type {
-            AnimationNodeType::Clip(handle) => clips.get_mut(handle),
-            _ => unreachable!(),
-        };
-        clip.unwrap()
-    }
-
     for (entity, mut player) in &mut players {
-        let graph = graphs.get(&animations.graph).unwrap();
-
-        let running_animation = get_clip(animations.animations[1], graph, &mut clips);
-        //println!("Running animation: {:?}", running_animation);
-        // You can determine the time an event should trigger if you know witch frame it occurs and
-        // the frame rate of the animation. Let's say we want to trigger an event at frame 15,
-        // and the animation has a frame rate of 24 fps, then time = 15 / 24 = 0.625.
-
         let mut transitions = AnimationTransitions::new();
-
         // Make sure to start the animation via the `AnimationTransitions`
         // component. The `AnimationTransitions` component wants to manage all
         // the animations and will get confused if the animations are started
@@ -119,27 +94,9 @@ pub fn keyboard_animation_control(
     };
 
     for (mut anim_player, mut transitions) in &mut animation_players {
-        let Some((&playing_animation_index, _)) = anim_player.playing_animations().next() else {
-            continue;
-        };
-
         // Update attack timer if we're attacking
         if *is_attacking {
             if let Some(timer) = attack_timer.as_mut() {
-                // Scale animation rate based on stamina level - slower when low stamina
-                let animation_rate = if player.stamina < 30.0 {
-                    // Scale: 0.7 to 1.0 based on stamina
-                    0.7 + (player.stamina / 30.0) * 0.3
-                } else {
-                    1.0
-                };
-                
-                let time_scale = if player.exhausted { 0.6 } else { animation_rate };
-                
-                // Set player animation playback rate
-                // Note: In Bevy 0.15, we might need to adjust this differently
-                // Instead of directly setting speed, we'll modify the transitions
-                
                 // Progress timer
                 timer.tick(time.delta());
                 
@@ -151,8 +108,7 @@ pub fn keyboard_animation_control(
                     // Return to idle or running based on movement state
                     if player.is_moving && player.stamina > 10.0 && !player.exhausted {
                         transitions
-                            .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25))
-                            .repeat();
+                            .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25));
                         *current_animation = 3;
                     } else {
                         transitions
