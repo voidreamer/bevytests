@@ -2,6 +2,8 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions, Window, WindowResolution},
 };
+use bevy_lunex::{UiLunexDebugPlugin, UiLunexPlugin};
+use bevy_hanabi::*;
 
 mod rendering;
 mod player;
@@ -10,6 +12,8 @@ mod world;
 mod lighting;
 mod animation;
 mod ui;
+mod menu;
+mod fx;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -49,9 +53,15 @@ fn main() {
             player::PlayerPlugin,
             camera::CameraPlugin,
             world::WorldPlugin,
+            menu::MenuPlugin,// This one doesnt work yet
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
-            ui::UIPlugin,
+            fx::FXPlugin, // Local FX
+            ui::UIPlugin, 
+
+            HanabiPlugin, // This one is for GPU Fx
+            UiLunexPlugin,
+            UiLunexDebugPlugin::<1, 2>
         ))
         // Set a dark sky color
         .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))

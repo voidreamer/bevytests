@@ -1,18 +1,10 @@
 use bevy::{
-    prelude::*,
-    window::PrimaryWindow,
-    input::{
-        mouse::{MouseMotion, MouseWheel},
-        keyboard::KeyCode,
-    },
-    core_pipeline::bloom::Bloom,
-    core_pipeline::motion_blur::MotionBlur,
-    core_pipeline::tonemapping::Tonemapping,
-    core_pipeline::experimental::taa::{TemporalAntiAliasing, TemporalAntiAliasPlugin},
-    pbr::VolumetricFog,
-    pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel},
+    core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping}, input::{
+        keyboard::KeyCode, mouse::{MouseMotion, MouseWheel}
+    }, pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel, VolumetricFog}, prelude::*, render::view::RenderLayers, window::PrimaryWindow
 
 };
+use bevy_lunex::UiSourceCamera;
 use crate::player::Player;
 
 #[derive(Component)]
@@ -53,11 +45,13 @@ fn spawn_camera(
 ) {
     commands.spawn((
         Camera3d::default(),
+        UiSourceCamera::<0>,
+        RenderLayers::from_layers(&[0, 2]),
         Camera {
             hdr: true,
             ..default()
         },
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        Transform::from_xyz(0.0, 0.0, 1000.0),
 
         DistanceFog{
             color: Color::srgb_u8(43, 44, 100),

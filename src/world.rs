@@ -42,7 +42,17 @@ pub fn spawn_scene(
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
         Player::default(),
-    ));
+    ))
+    .insert(RigidBody::KinematicPositionBased)
+    .insert(Collider::capsule_y(1.0, 0.3))
+    .insert(KinematicCharacterController{
+        offset: CharacterLength::Absolute(0.01),
+        ..default()
+    })
+    .insert(Velocity{
+        linvel: Vec3::new(0.0, 0.3, 0.0),
+        angvel: Vec3::new(0.2, 0.0, 0.0),
+    });
     
     // ==============================================
     // Create environment props
@@ -88,7 +98,7 @@ pub fn spawn_scene(
         ..default()
     });
     
-    for i in 0..20 {
+    for i in 0..30 {
         let angle = i as f32 * std::f32::consts::PI * 2.0 / 20.0;
         let distance = 7.0 + (i as f32 * 0.3).sin() * 3.0;
         let x = angle.sin() * distance;
@@ -101,13 +111,13 @@ pub fn spawn_scene(
         ))
         .insert(RigidBody::Dynamic)
         .insert(Velocity{
-            linvel: Vec3::new(0.0, 2.0, 0.0),
+            linvel: Vec3::new(0.0, 0.3, 0.0),
             angvel: Vec3::new(0.2, 0.0, 0.0),
         })
         .insert(Collider::cuboid(1.0, 1.0, 1.0))
         .insert(GravityScale(2.0))
         .insert(Ccd::enabled())
-        .insert(Restitution::coefficient(0.2));
+        .insert(Restitution::coefficient(0.8));
     }
     
     // Add some decorative objects (dynamic spheres)
@@ -131,7 +141,16 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
-        ));
+        ))
+        .insert(RigidBody::Dynamic)
+        .insert(Velocity{
+            linvel: Vec3::new(0.0, 0.3, 0.0),
+            angvel: Vec3::new(0.2, 0.0, 0.0),
+        })
+        .insert(Collider::ball(1.0))
+        .insert(GravityScale(2.0))
+        .insert(Ccd::enabled())
+        .insert(Restitution::coefficient(0.8));
     }
 }
 
