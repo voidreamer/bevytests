@@ -30,9 +30,9 @@ pub fn setup_animations(
         asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(4).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(5).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
     ]);
     let graph_handle = graphs.add(graph);
     commands.insert_resource(Animations{

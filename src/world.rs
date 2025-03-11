@@ -16,26 +16,6 @@ pub fn spawn_scene(
 ) {
     println!("Spawning third-person game world with physics...");
     
-    let ground_size = 50.0;
-
-    // ==============================================
-    // Create ground plane (static)
-    // ==============================================
-    let _ground_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.2, 0.3, 0.2),
-        metallic: 0.1,
-        perceptual_roughness: 0.7,
-        reflectance: 0.2,
-        ..default()
-    });
-    
-    let _ground_mesh = meshes.add(Plane3d::default().mesh().size(ground_size, ground_size));
-    
-    commands.spawn((
-        Mesh3d(_ground_mesh), 
-        MeshMaterial3d(_ground_material), 
-    ));
-    
     // ==============================================
     // Create player character 
     // ==============================================
@@ -53,73 +33,8 @@ pub fn spawn_scene(
         linvel: Vec3::new(0.0, 0.3, 0.0),
         angvel: Vec3::new(0.2, 0.0, 0.0),
     });
-    
-    // ==============================================
-    // Create environment props
-    // ==============================================
+   
 
-    /*
-    commands.spawn(FogVolume{
-        density_factor: 0.02,
-        ..default()
-    });
-    */
-
-    // Create some pillars (static)
-    let pillar_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.7, 0.7, 0.8),
-        metallic: 0.0,
-        perceptual_roughness: 0.6,
-        reflectance: 0.1,
-        ..default()
-    });
-    
-    let pillar_mesh = meshes.add(Cylinder::new(0.7, 6.0));
-    
-    for i in 0..12 {
-        let angle = i as f32 * std::f32::consts::PI * 2.0 / 12.0;
-        let distance = 12.0;
-        let x = angle.sin() * distance;
-        let z = angle.cos() * distance;
-        
-        commands.spawn((
-            Mesh3d(pillar_mesh.clone()),
-            MeshMaterial3d(pillar_material.clone()),
-            Transform::from_xyz(x, 3.0, z),
-        ));
-    }
-    
-    // Create some smaller obstacles (dynamic cubes)
-    let _obstacle_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.3, 0.3, 0.4),
-        metallic: 0.2,
-        perceptual_roughness: 0.4,
-        reflectance: 0.3,
-        ..default()
-    });
-    
-    for i in 0..30 {
-        let angle = i as f32 * std::f32::consts::PI * 2.0 / 20.0;
-        let distance = 7.0 + (i as f32 * 0.3).sin() * 3.0;
-        let x = angle.sin() * distance;
-        let z = angle.cos() * distance;
-        
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::from_length(2.0))),
-            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-            Transform::from_xyz(x, 5.5, z),
-        ))
-        .insert(RigidBody::Dynamic)
-        .insert(Velocity{
-            linvel: Vec3::new(0.0, 0.3, 0.0),
-            angvel: Vec3::new(0.2, 0.0, 0.0),
-        })
-        .insert(Collider::cuboid(1.0, 1.0, 1.0))
-        .insert(GravityScale(2.0))
-        .insert(Ccd::enabled())
-        .insert(Restitution::coefficient(0.8));
-    }
-    
     // Add some decorative objects (dynamic spheres)
     let sphere_mesh = meshes.add(Sphere::new(0.8));
     
@@ -152,6 +67,16 @@ pub fn spawn_scene(
         .insert(Ccd::enabled())
         .insert(Restitution::coefficient(0.8));
     }
+
+    // Testing some assets
+    commands.spawn(SceneRoot(asset_server.load(
+        "models/girly.glb#Scene0")));
+
+    commands.spawn((
+        SceneRoot(asset_server.load(
+        "models/huge_icelandic_lava_cliff_sieoz_high.glb#Scene0")),
+        Transform::from_xyz(0.0, 0.0, 0.0)
+    ));
 }
 
 // ==============================================

@@ -2,7 +2,6 @@ use bevy::{
     core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping}, input::{
         keyboard::KeyCode, mouse::{MouseMotion, MouseWheel}
     }, pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel, VolumetricFog}, prelude::*, render::view::RenderLayers, window::PrimaryWindow
-
 };
 use bevy_lunex::UiSourceCamera;
 use crate::player::Player;
@@ -45,13 +44,14 @@ fn spawn_camera(
 ) {
     commands.spawn((
         Camera3d::default(),
-        UiSourceCamera::<0>,
-        RenderLayers::from_layers(&[0, 2]),
         Camera {
             hdr: true,
             ..default()
         },
+        // This is for Lunex aparently, but doesnt work.
         Transform::from_xyz(0.0, 0.0, 1000.0),
+        UiSourceCamera::<0>,
+        RenderLayers::from_layers(&[0, 2]),
 
         DistanceFog{
             color: Color::srgb_u8(43, 44, 100),
@@ -68,7 +68,6 @@ fn spawn_camera(
         Tonemapping::TonyMcMapface,
         // Msaa is off to let ssao work.
         Msaa::Off,
-        // TODO: SSAO doesnt seem to work despite I get no errors.
         ScreenSpaceAmbientOcclusion::default(),
         TemporalAntiAliasing::default(),
         

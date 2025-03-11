@@ -5,7 +5,6 @@ use bevy::{
 use bevy_lunex::{UiLunexDebugPlugin, UiLunexPlugin};
 use bevy_hanabi::*;
 
-mod rendering;
 mod player;
 mod camera;
 mod world;
@@ -14,6 +13,7 @@ mod animation;
 mod ui;
 mod menu;
 mod fx;
+mod shader;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -56,8 +56,9 @@ fn main() {
             menu::MenuPlugin,// This one doesnt work yet
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
-            fx::FXPlugin, // Local FX
+            // fx::FXPlugin, // Disable til this works.
             ui::UIPlugin, 
+            shader::ShaderPlugin, 
 
             HanabiPlugin, // This one is for GPU Fx
             UiLunexPlugin,
