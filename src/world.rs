@@ -1,36 +1,15 @@
-use avian3d::prelude::{Collider, ColliderConstructor, RigidBody};
-use bevy::{
-    gltf::GltfMeshExtras, prelude::*, scene::SceneInstanceReady, 
-    // pbr::FogVolume,
-};
+use avian3d::prelude::{Collider, RigidBody};
+use bevy::prelude::*;
 
-use serde::{Deserialize, Serialize};
 use std::{
     f32::consts::{FRAC_PI_4, PI},
     time::Duration,
 };
 use crate::player::Player;
+use crate::physics::on_level_spawn;
 
 const CHARACTER_PATH: &str = "models/character.glb";
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BMeshExtras {
-    pub collider: BCollider,
-    pub rigid_body: BRigidBody,
-    pub cube_size: Option<Vec3>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum BCollider {
-    TrimeshFromMesh,
-    Cubiod,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum BRigidBody {
-    Static,
-    Dynamic,
-}
 
 // Scene creation system with physics
 pub fn spawn_scene(
@@ -112,61 +91,6 @@ pub fn spawn_scene(
     */
 }
 
-fn on_level_spawn(
-    trigger: Trigger<SceneInstanceReady>,
-    mut commands: Commands,
-    children: Query<&Children>,
-    extras: Query<&GltfMeshExtras>,
-) {
-    for entity in
-        children.iter_descendants(trigger.entity())
-    {
-        let Ok(gltf_mesh_extras) = extras.get(entity)
-        else {
-            continue;
-        };
-        let Ok(data) = serde_json::from_str::<BMeshExtras>(
-            &gltf_mesh_extras.value,
-        ) else {
-            error!("couldn't deseralize extras");
-            continue;
-        };
-        dbg!(&data);
-        match data.collider {
-            BCollider::TrimeshFromMesh => {
-                commands.entity(entity).insert((
-                    match data.rigid_body {
-                        BRigidBody::Static => {
-                            RigidBody::Static
-                        }
-                        BRigidBody::Dynamic => {
-                            RigidBody::Dynamic
-                        }
-                    },
-                    ColliderConstructor::TrimeshFromMesh,
-                ));
-            }
-            BCollider::Cubiod => {
-                let size = data.cube_size.expect(
-                    "Cubiod collider must have cube_size",
-                );
-                commands.entity(entity).insert((
-                    match data.rigid_body {
-                        BRigidBody::Static => {
-                            RigidBody::Static
-                        }
-                        BRigidBody::Dynamic => {
-                            RigidBody::Dynamic
-                        }
-                    },
-                    Collider::cuboid(
-                        size.x, size.y, size.z,
-                    ),
-                ));
-            }
-        }
-    }
-}
 
 // ==============================================
 // Some simple UI text 
@@ -198,6 +122,9 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-            app.add_systems(Startup, (setup, spawn_scene));
+            app
+            // Set a dark sky color
+            .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))
+            .add_systems(Startup, (setup, spawn_scene));
     }
 }

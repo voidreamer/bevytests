@@ -55,7 +55,5 @@ fn main() {
             ui::UIPlugin, 
             shader::ShaderPlugin, 
         ))
-        // Set a dark sky color
-        .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))
         .run();
 }
