@@ -9,16 +9,19 @@ use bevy::{
 use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
-
+// Better organized animation resource
 #[derive(Resource)]
-pub struct Animations {
-    pub animations: Vec<AnimationNodeIndex>,
+pub struct PlayerAnimations {
+    pub idle: AnimationNodeIndex,
+    pub walk: AnimationNodeIndex,
+    pub jump: AnimationNodeIndex,
+    pub run: AnimationNodeIndex,
+    pub attack: AnimationNodeIndex,
+    pub special: AnimationNodeIndex,  // The 6th animation
     pub graph: Handle<AnimationGraph>,
 }
 
-// ==============================================
-// Setup player animation
-// ==============================================
+// Setup animations with the new structure
 pub fn setup_animations(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -26,34 +29,43 @@ pub fn setup_animations(
 ) {
     println!("Setting up character animations...");
 
-    let (graph, node_indices) = AnimationGraph::from_clips([
+    // Load all animations like before
+    let anim_handles = [
         asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(4).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(5).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
-    ]);
+    ];
+
+    // Create animation graph with all clips
+    let (graph, node_indices) = AnimationGraph::from_clips(anim_handles);
     let graph_handle = graphs.add(graph);
-    commands.insert_resource(Animations{
-        animations: node_indices,
+    
+    // Store with better naming
+    commands.insert_resource(PlayerAnimations {
+        walk: node_indices[0],
+        idle: node_indices[1],
+        jump: node_indices[2],
+        special: node_indices[3],
+        run: node_indices[4],
+        attack: node_indices[5],
         graph: graph_handle,
     });
 }
 
+// Update scene once loaded - same as before but with new structure
 pub fn setup_scene_once_loaded(
     mut commands: Commands,
-    animations: Res<Animations>,
+    animations: Res<PlayerAnimations>,
     mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
 ) {
     for (entity, mut player) in &mut players {
         let mut transitions = AnimationTransitions::new();
-        // Make sure to start the animation via the `AnimationTransitions`
-        // component. The `AnimationTransitions` component wants to manage all
-        // the animations and will get confused if the animations are started
-        // directly via the `AnimationPlayer`.
+        // Start with idle animation
         transitions
-            .play(&mut player, animations.animations[1], Duration::ZERO)
+            .play(&mut player, animations.idle, Duration::ZERO)
             .repeat();
 
         commands
@@ -63,11 +75,12 @@ pub fn setup_scene_once_loaded(
     }
 }
 
+// Keyboard animation control - same logic but use named animation indices
 pub fn keyboard_animation_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-    animations: Res<Animations>,
+    animations: Res<PlayerAnimations>,
     mut player_query: Query<&mut Player>,
     mut current_animation: Local<usize>,
     mut is_moving: Local<bool>,
@@ -109,11 +122,11 @@ pub fn keyboard_animation_control(
                     // Return to idle or running based on movement state
                     if player.is_moving && player.stamina > 10.0 && !player.exhausted {
                         transitions
-                            .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25));
+                            .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25));
                         *current_animation = 3;
                     } else {
                         transitions
-                            .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
+                            .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
                             .repeat();
                     }
                 }
@@ -135,8 +148,6 @@ pub fn keyboard_animation_control(
                 };
                 
                 // Progress timer - adjust based on stamina level
-                // If player is exhausted or has low stamina, the animation plays slower
-                // which we simulate by advancing the timer more slowly
                 let dt_scale = if player.exhausted { 
                     0.6
                 } else { 
@@ -154,13 +165,13 @@ pub fn keyboard_animation_control(
                         *is_moving = true;
                         *current_animation = 3;
                         transitions
-                            .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25))
+                            .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25))
                             .repeat();
                     } else {
                         *is_moving = false;
                         *current_animation = 0;
                         transitions
-                            .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
+                            .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
                             .repeat();
                     }
                 }
@@ -184,9 +195,9 @@ pub fn keyboard_animation_control(
             // Use stamina for attack
             player.stamina = (player.stamina - 15.0).max(0.0);
             
-            // Start the attack animation and set the timer
+            // Start the attack animation
             transitions
-                .play(&mut anim_player, animations.animations[4], Duration::from_secs_f32(0.25));
+                .play(&mut anim_player, animations.attack, Duration::from_secs_f32(0.25));
             
             if let Some(timer) = attack_timer.as_mut() {
                 // Set timer for the attack animation's duration
@@ -211,7 +222,7 @@ pub fn keyboard_animation_control(
                 
                 // Play jump animation
                 transitions
-                    .play(&mut anim_player, animations.animations[2], Duration::from_secs_f32(0.25))
+                    .play(&mut anim_player, animations.jump, Duration::from_secs_f32(0.25))
                     .repeat();
                 
                 // Set jump timer
@@ -232,7 +243,7 @@ pub fn keyboard_animation_control(
                 if !was_moving || *current_animation != 3 {
                     *current_animation = 3;
                     transitions
-                        .play(&mut anim_player, animations.animations[3], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25))
                         .repeat();
                 }
             }
@@ -242,9 +253,9 @@ pub fn keyboard_animation_control(
                 
                 // Special case - when exhausted but still trying to move
                 if *current_animation != 1 {
-                    *current_animation = 1; // Use default animation as "tired" animation
+                    *current_animation = 1;
                     transitions
-                        .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.walk, Duration::from_secs_f32(0.25))
                         .repeat();
                 }
             } else {
@@ -254,7 +265,7 @@ pub fn keyboard_animation_control(
                 if was_moving || (*current_animation != 0 && *current_animation != 1) {
                     *current_animation = 0;
                     transitions
-                        .play(&mut anim_player, animations.animations[1], Duration::from_secs_f32(0.25))
+                        .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
                         .repeat();
                 }
             }

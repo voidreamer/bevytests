@@ -1,5 +1,6 @@
 use bevy::{
     prelude::*,
+    pbr::experimental::meshlet::MeshletPlugin,
     window::{CursorGrabMode, CursorOptions, Window, WindowResolution},
 };
 use bevy_lunex::{UiLunexDebugPlugin, UiLunexPlugin};
@@ -59,6 +60,10 @@ fn main() {
             // fx::FXPlugin, // Disable til this works.
             ui::UIPlugin, 
             shader::ShaderPlugin, 
+
+            MeshletPlugin{
+                cluster_buffer_slots: 8192,
+            },
 
             HanabiPlugin, // This one is for GPU Fx
             UiLunexPlugin,

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = {version = "0.15", features=["jpeg"]}
+bevy = {version = "0.15", features=["jpeg", "meshlet", "meshlet_processor"]}
 bevy_animation_graph = {git = "https://github.com/mbrea-c/bevy_animation_graph.git"}
 bevy_rapier3d = { version = "0.29.0", features = ["simd-stable", "debug-render-3d"]}
 bevy_ui = "0.15.3"
