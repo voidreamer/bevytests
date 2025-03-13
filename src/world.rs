@@ -68,6 +68,7 @@ pub fn spawn_scene(
         .insert(Restitution::coefficient(0.8));
     }
 
+    /*
     // Testing some assets
     commands.spawn(SceneRoot(asset_server.load(
         "models/girly.glb#Scene0")));
@@ -77,6 +78,7 @@ pub fn spawn_scene(
         "models/huge_icelandic_lava_cliff_sieoz_high.glb#Scene0")),
         Transform::from_xyz(0.0, 0.0, 0.0)
     ));
+    */
 }
 
 // ==============================================

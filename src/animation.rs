@@ -13,11 +13,12 @@ const CHARACTER_PATH: &str = "models/character.glb";
 #[derive(Resource)]
 pub struct PlayerAnimations {
     pub idle: AnimationNodeIndex,
-    pub walk: AnimationNodeIndex,
+    pub tpose: AnimationNodeIndex,
     pub jump: AnimationNodeIndex,
     pub run: AnimationNodeIndex,
     pub attack: AnimationNodeIndex,
-    pub special: AnimationNodeIndex,  // The 6th animation
+    pub roll: AnimationNodeIndex,  
+    pub walk: AnimationNodeIndex,  
     pub graph: Handle<AnimationGraph>,
 }
 
@@ -37,6 +38,7 @@ pub fn setup_animations(
         asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(4).from_asset(CHARACTER_PATH)),
         asset_server.load(GltfAssetLabel::Animation(5).from_asset(CHARACTER_PATH)),
+        asset_server.load(GltfAssetLabel::Animation(6).from_asset(CHARACTER_PATH)),
     ];
 
     // Create animation graph with all clips
@@ -45,12 +47,13 @@ pub fn setup_animations(
     
     // Store with better naming
     commands.insert_resource(PlayerAnimations {
-        walk: node_indices[0],
+        tpose: node_indices[0],
         idle: node_indices[1],
         jump: node_indices[2],
-        special: node_indices[3],
+        roll: node_indices[3],
         run: node_indices[4],
         attack: node_indices[5],
+        walk: node_indices[6],
         graph: graph_handle,
     });
 }
@@ -75,199 +78,328 @@ pub fn setup_scene_once_loaded(
     }
 }
 
-// Keyboard animation control - same logic but use named animation indices
-pub fn keyboard_animation_control(
+pub fn keyboard_movement_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    mut player_query: Query<(&mut Transform, &mut Player)>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<PlayerAnimations>,
-    mut player_query: Query<&mut Player>,
-    mut current_animation: Local<usize>,
+    camera_query: Query<&Transform, (With<Camera3d>, Without<Player>)>,
+    time: Res<Time>,
     mut is_moving: Local<bool>,
+    mut current_animation: Local<usize>,
     mut is_jumping: Local<bool>,
     mut is_attacking: Local<bool>,
+    mut is_rolling: Local<bool>,
     mut attack_timer: Local<Option<Timer>>,
     mut jump_timer: Local<Option<Timer>>,
-    time: Res<Time>,
+    mut roll_timer: Local<Option<Timer>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
 ) {
-    // Initialize the attack timer if it's None
+    // Initialize timers if needed
     if attack_timer.is_none() {
         *attack_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
     }
     
-    // Initialize the jump timer if it's None
     if jump_timer.is_none() {
         *jump_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
     }
-
-    // Get player reference
-    let mut player = if let Ok(p) = player_query.get_single_mut() {
-        p
+    
+    if roll_timer.is_none() {
+        *roll_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
+    }
+    
+    // Get camera for movement direction
+    let camera_transform = if let Ok(camera) = camera_query.get_single() {
+        camera
     } else {
         return;
     };
-
-    for (mut anim_player, mut transitions) in &mut animation_players {
-        // Update attack timer if we're attacking
-        if *is_attacking {
-            if let Some(timer) = attack_timer.as_mut() {
-                // Progress timer
-                timer.tick(time.delta());
-                
-                // If attack animation is complete, return to idle
-                if timer.finished() {
-                    *is_attacking = false;
-                    *current_animation = 0;
-                    
-                    // Return to idle or running based on movement state
-                    if player.is_moving && player.stamina > 10.0 && !player.exhausted {
-                        transitions
-                            .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25));
-                        *current_animation = 3;
-                    } else {
-                        transitions
-                            .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
-                            .repeat();
-                    }
-                }
-                
-                // Skip other animation checks while attacking
-                continue;
+    
+    // Get player transform
+    if let Ok((mut transform, mut player)) = player_query.get_single_mut() {
+        // Update timers
+        if let Some(timer) = attack_timer.as_mut() {
+            timer.tick(time.delta());
+            
+            // Reset attack state when timer finishes
+            if timer.finished() && *is_attacking {
+                *is_attacking = false;
             }
         }
         
-        // Update jump timer if we're jumping
-        if *is_jumping {
-            if let Some(timer) = jump_timer.as_mut() {
-                // Scale animation rate based on stamina level
-                let animation_rate = if player.stamina < 30.0 {
-                    // Scale: 0.7 to 1.0 based on stamina
-                    0.7 + (player.stamina / 30.0) * 0.3
-                } else {
-                    1.0
-                };
+        if let Some(timer) = jump_timer.as_mut() {
+            timer.tick(time.delta());
+            
+            // Reset jump state when timer finishes
+            if timer.finished() && *is_jumping {
+                *is_jumping = false;
+            }
+        }
+        
+        if let Some(timer) = roll_timer.as_mut() {
+            timer.tick(time.delta());
+            
+            // Reset roll state when timer finishes
+            if timer.finished() && *is_rolling {
+                *is_rolling = false;
+            }
+        }
+        
+        // Calculate camera directions for movement
+        let forward = camera_transform.forward();
+        let camera_forward = Vec3::new(forward.x, 0.0, forward.z).normalize();
+        let camera_right = camera_forward.cross(Vec3::Y).normalize();
+        
+        // Initialize movement direction
+        let mut direction = Vec3::ZERO;
+        let mut any_movement = false;
+        
+        // Check each movement key and add its contribution
+        if keyboard_input.pressed(KeyCode::KeyW) {
+            direction += camera_forward;
+            any_movement = true;
+        }
+        if keyboard_input.pressed(KeyCode::KeyS) {
+            direction -= camera_forward;
+            any_movement = true;
+        }
+        if keyboard_input.pressed(KeyCode::KeyA) {
+            direction -= camera_right;
+            any_movement = true;
+        }
+        if keyboard_input.pressed(KeyCode::KeyD) {
+            direction += camera_right;
+            any_movement = true;
+        }
+        
+        // Update player's moving state
+        player.is_moving = any_movement;
+        *is_moving = any_movement;
+        
+        // Apply movement if we have input and not in certain animations
+        if any_movement && !*is_rolling {
+            direction = direction.normalize();
+            
+            // Calculate movement speed based on player state
+            let base_speed = 5.0; // Base movement speed
+            let speed_multiplier = if player.exhausted {
+                0.5 // Slower when exhausted
+            } else if keyboard_input.pressed(KeyCode::ShiftLeft) && player.stamina > 10.0 {
+                2.0 // Running speed
+            } else {
+                1.0 // Walking speed
+            };
+            
+            // Apply movement
+            let movement = direction * base_speed * speed_multiplier * time.delta_secs();
+            transform.translation += movement;
+            
+            // Rotate player to face movement direction with smoothing
+            if direction.length_squared() > 0.01 {
+                let target_rotation = Quat::from_rotation_y(
+                    f32::atan2(direction.x, direction.z)
+                );
                 
-                // Progress timer - adjust based on stamina level
-                let dt_scale = if player.exhausted { 
-                    0.6
-                } else { 
-                    animation_rate 
-                };
-                let adjusted_dt = time.delta_secs() * dt_scale;
-                timer.tick(Duration::from_secs_f32(adjusted_dt));
-                
-                // If jump animation is complete, return to idle or running
-                if timer.finished() {
-                    *is_jumping = false;
-                    
-                    // Return to running if W is still pressed and not exhausted, otherwise idle
-                    if keyboard_input.pressed(KeyCode::KeyW) && player.stamina > 10.0 && !player.exhausted {
-                        *is_moving = true;
-                        *current_animation = 3;
-                        transitions
-                            .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25))
-                            .repeat();
+                // Smoothly rotate towards movement direction
+                transform.rotation = transform.rotation.slerp(
+                    target_rotation, 
+                    10.0 * time.delta_secs()
+                );
+            }
+        }
+        
+        // Handle animations
+        for (mut anim_player, mut transitions) in &mut animation_players {
+            // Priority order for animations:
+            // 1. Attacking
+            // 2. Rolling
+            // 3. Jumping
+            // 4. Running/Walking/Idle
+            
+            // Handle attack
+            if *is_attacking {
+                if let Some(timer) = attack_timer.as_mut() {
+                    if timer.just_finished() {
+                        *is_attacking = false;
+                        // Animation will be handled in movement code below
                     } else {
-                        *is_moving = false;
-                        *current_animation = 0;
-                        transitions
-                            .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
-                            .repeat();
+                        continue; // Skip other animations while attacking
                     }
                 }
-                
-                // Skip other animation checks while jumping
-                continue;
-            }
-        }
-
-        // Handle attack animation with left mouse button
-        // Only if enough stamina and not exhausted
-        if mouse_button_input.just_pressed(MouseButton::Left) && 
-           !*is_attacking && !*is_jumping && 
-           player.stamina >= 15.0 && !player.exhausted {
-            
-            *is_attacking = true;
-            *is_moving = false;
-            *is_jumping = false;
-            *current_animation = 4;
-            
-            // Use stamina for attack
-            player.stamina = (player.stamina - 15.0).max(0.0);
-            
-            // Start the attack animation
-            transitions
-                .play(&mut anim_player, animations.attack, Duration::from_secs_f32(0.25));
-            
-            if let Some(timer) = attack_timer.as_mut() {
-                // Set timer for the attack animation's duration
-                timer.set_duration(Duration::from_secs_f32(1.5));
-                timer.reset();
             }
             
-            continue; // Skip other animation checks
-        }
-
-        // Only process other animations if we're not attacking or jumping
-        if !*is_attacking && !*is_jumping {
-            let was_moving = *is_moving;
-            
-            // Check for Space key (jump) - this now takes priority over running
-            // Only jump if we have enough stamina and not exhausted
-            if keyboard_input.just_pressed(KeyCode::Space) && 
-               player.stamina >= 20.0 && !player.exhausted {
+            // Check for new attack input
+            if mouse_button_input.just_pressed(MouseButton::Left) && 
+               !*is_attacking && !*is_jumping && !*is_rolling && 
+               player.stamina >= 15.0 && !player.exhausted {
                 
-                *is_jumping = true;
-                *current_animation = 2;
+                *is_attacking = true;
                 
-                // Play jump animation
+                // Use stamina for attack
+                player.stamina = (player.stamina - 15.0).max(0.0);
+                
+                // Play attack animation
+                *current_animation = 5; // attack
                 transitions
-                    .play(&mut anim_player, animations.jump, Duration::from_secs_f32(0.25))
-                    .repeat();
+                    .play(&mut anim_player, animations.attack, Duration::from_secs_f32(0.15));
                 
-                // Set jump timer
-                if let Some(timer) = jump_timer.as_mut() {
-                    // Set jump animation duration - adjust as needed
-                    timer.set_duration(Duration::from_secs_f32(1.0)); 
+                if let Some(timer) = attack_timer.as_mut() {
+                    timer.set_duration(Duration::from_secs_f32(1.5));
                     timer.reset();
                 }
                 
                 continue;
             }
-            // Check if W is pressed to trigger running animation
-            // Only run if not exhausted
-            else if keyboard_input.pressed(KeyCode::KeyW) && !player.exhausted {
-                *is_moving = true;
-                
-                // Only switch if we weren't already moving or current animation is not running
-                if !was_moving || *current_animation != 3 {
-                    *current_animation = 3;
-                    transitions
-                        .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25))
-                        .repeat();
+            
+            // Handle roll
+            if *is_rolling {
+                if let Some(timer) = roll_timer.as_mut() {
+                    if timer.just_finished() {
+                        *is_rolling = false;
+                        // Animation will be handled in movement code below
+                    } else {
+                        continue; // Skip other animations while rolling
+                    }
                 }
             }
-            // Use tired/slower walking animation when exhausted but trying to move
-            else if keyboard_input.pressed(KeyCode::KeyW) && player.exhausted {
-                *is_moving = true;
+            
+            // Check for new roll input (Space key)
+            if keyboard_input.just_pressed(KeyCode::Space) && 
+               !*is_attacking && !*is_jumping && !*is_rolling && 
+               player.stamina >= 25.0 && !player.exhausted {
                 
-                // Special case - when exhausted but still trying to move
-                if *current_animation != 1 {
-                    *current_animation = 1;
-                    transitions
-                        .play(&mut anim_player, animations.walk, Duration::from_secs_f32(0.25))
-                        .repeat();
-                }
-            } else {
-                // Return to idle when no keys are pressed
-                *is_moving = false;
+                *is_rolling = true;
                 
-                if was_moving || (*current_animation != 0 && *current_animation != 1) {
-                    *current_animation = 0;
-                    transitions
-                        .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
-                        .repeat();
+                // Use stamina for roll
+                player.stamina = (player.stamina - 25.0).max(0.0);
+                
+                // Play roll animation
+                *current_animation = 3; // roll
+                transitions
+                    .play(&mut anim_player, animations.roll, Duration::from_secs_f32(0.1))
+                    .repeat();
+                
+                if let Some(timer) = roll_timer.as_mut() {
+                    timer.set_duration(Duration::from_secs_f32(0.8));
+                    timer.reset();
                 }
+                
+                // Apply a quick movement in the direction the player is facing
+                if any_movement {
+                    // Roll in movement direction
+                    transform.translation += direction * 2.0; // Quick boost
+                } else {
+                    // Roll forward if not moving
+                    let forward_dir = transform.forward();
+                    transform.translation += forward_dir * 2.0;
+                }
+                
+                continue;
+            }
+            
+            // Handle jump
+            if *is_jumping {
+                if let Some(timer) = jump_timer.as_mut() {
+                    if timer.just_finished() {
+                        *is_jumping = false;
+                        // Animation will be handled in movement code below
+                    } else {
+                        continue; // Skip other animations while jumping
+                    }
+                }
+            }
+            
+            // Check for new jump input (Ctrl key)
+            if keyboard_input.just_pressed(KeyCode::ControlLeft) && 
+               !*is_attacking && !*is_jumping && !*is_rolling && 
+               player.stamina >= 20.0 && !player.exhausted {
+                
+                *is_jumping = true;
+                
+                // Use stamina for jump
+                player.stamina = (player.stamina - 20.0).max(0.0);
+                
+                // Play jump animation
+                *current_animation = 2; // jump
+                transitions
+                    .play(&mut anim_player, animations.jump, Duration::from_secs_f32(0.15))
+                    .repeat();
+                
+                if let Some(timer) = jump_timer.as_mut() {
+                    timer.set_duration(Duration::from_secs_f32(1.0));
+                    timer.reset();
+                }
+                
+                continue;
+            }
+            
+            // If no special animation is active, handle movement animations
+            if !*is_attacking && !*is_jumping && !*is_rolling {
+                if any_movement {
+                    let is_running = keyboard_input.pressed(KeyCode::ShiftLeft) && 
+                                     player.stamina > 10.0 && 
+                                     !player.exhausted;
+                    
+                    if is_running {
+                        // Drain stamina while running
+                        player.stamina = (player.stamina - 10.0 * time.delta_secs()).max(0.0);
+                        
+                        // Check if we need to become exhausted
+                        if player.stamina <= 10.0 {
+                            player.exhausted = true;
+                        }
+                        
+                        // Play run animation if not already running
+                        if *current_animation != 4 { // Run animation
+                            *current_animation = 4;
+                            transitions
+                                .play(&mut anim_player, animations.run, Duration::from_secs_f32(0.25))
+                                .repeat();
+                            
+                            //anim_player.set_playback_rate(1.0);
+                        }
+                    } else if player.exhausted {
+                        // Play walk animation when exhausted
+                        if *current_animation != 0 { // Walk animation
+                            *current_animation = 0;
+                            transitions
+                                .play(&mut anim_player, animations.walk, Duration::from_secs_f32(0.25))
+                                .repeat();
+                            
+                            // Slower animation when exhausted
+                            //anim_player.set_playback_rate(0.6);
+                        }
+                    } else {
+                        // Regular walking
+                        if *current_animation != 0 { // Walk animation
+                            *current_animation = 0;
+                            transitions
+                                .play(&mut anim_player, animations.walk, Duration::from_secs_f32(0.25))
+                                .repeat();
+                            
+                            // Normal animation speed
+                            //anim_player.set_playback_rate(1.0);
+                        }
+                    }
+                } else {
+                    // Idle when not moving
+                    if *current_animation != 1 { // Idle animation
+                        *current_animation = 1;
+                        transitions
+                            .play(&mut anim_player, animations.idle, Duration::from_secs_f32(0.25))
+                            .repeat();
+                    }
+                }
+            }
+        }
+        
+        // Regenerate stamina when not running
+        if !keyboard_input.pressed(KeyCode::ShiftLeft) || !player.is_moving {
+            player.stamina = (player.stamina + 15.0 * time.delta_secs()).min(100.0);
+            
+            // Clear exhaustion if stamina recovered enough
+            if player.stamina > 30.0 {
+                player.exhausted = false;
             }
         }
     }
@@ -281,6 +413,6 @@ impl Plugin for PlayerAnimationPlugin {
         app
             .add_systems(Startup, setup_animations)
             .add_systems(Update, setup_scene_once_loaded)
-            .add_systems(Update, keyboard_animation_control);
+            .add_systems(Update, keyboard_movement_control);
     }
 }

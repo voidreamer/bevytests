@@ -139,8 +139,8 @@ fn player_controller(
             }
         }
         
-        // Jump when on ground and space pressed - require minimum stamina
-        if player.on_ground && keyboard.just_pressed(KeyCode::Space) && player.stamina >= 20.0 {
+        // Jump when on ground and ctrl pressed - require minimum stamina
+        if player.on_ground && keyboard.just_pressed(KeyCode::ControlLeft) && player.stamina >= 20.0 {
             player.velocity.y = player.jump_force;
             player.on_ground = false;
             
