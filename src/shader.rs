@@ -1,7 +1,5 @@
 use bevy::{
-      prelude::*,
-      reflect::TypePath,
-      render::render_resource::{AsBindGroup, ShaderRef},
+      math::VectorSpace, prelude::*, reflect::TypePath, render::render_resource::{AsBindGroup, ShaderRef}
 };
 
 const AURORA_SHADER_PATH: &str = "shaders/aurora.wgsl";
@@ -21,9 +19,9 @@ fn setup(
       mut materials: ResMut<Assets<AuroraShaderMaterial>>,
 ){
       commands.spawn((
-            Mesh3d(meshes.add(Cuboid::default())),
+            Mesh3d(meshes.add(Sphere::new(500.0))),
             MeshMaterial3d(materials.add(AuroraShaderMaterial {})),
-            Transform::from_xyz(0.0, 0.0, 0.0),
+            Transform::from_xyz(500.0, 500.0, 1000.0).looking_at(Vec3::ZERO, Vec3::Y),
       ));
 }
 

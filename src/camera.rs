@@ -1,3 +1,4 @@
+use avian3d::prelude::{Collider, RigidBody};
 use bevy::{
     core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping}, input::{
         keyboard::KeyCode, mouse::{MouseMotion, MouseWheel}
@@ -91,6 +92,7 @@ fn spawn_camera(
         
         // Add third-person camera controller
         ThirdPersonCamera::default(),
+
     ))
     .insert(ScreenSpaceAmbientOcclusion{
         quality_level: ScreenSpaceAmbientOcclusionQualityLevel::High,

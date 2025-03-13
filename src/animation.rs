@@ -9,9 +9,9 @@ use bevy::{
 use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
-// Better organized animation resource
+
 #[derive(Resource)]
-pub struct PlayerAnimations {
+pub struct PlayerAnimationNodes {
     pub idle: AnimationNodeIndex,
     pub tpose: AnimationNodeIndex,
     pub jump: AnimationNodeIndex,
@@ -46,7 +46,7 @@ pub fn setup_animations(
     let graph_handle = graphs.add(graph);
     
     // Store with better naming
-    commands.insert_resource(PlayerAnimations {
+    commands.insert_resource(PlayerAnimationNodes {
         tpose: node_indices[0],
         idle: node_indices[1],
         jump: node_indices[2],
@@ -61,7 +61,7 @@ pub fn setup_animations(
 // Update scene once loaded - same as before but with new structure
 pub fn setup_scene_once_loaded(
     mut commands: Commands,
-    animations: Res<PlayerAnimations>,
+    animations: Res<PlayerAnimationNodes>,
     mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
 ) {
     for (entity, mut player) in &mut players {
@@ -82,7 +82,7 @@ pub fn keyboard_movement_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<(&mut Transform, &mut Player)>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-    animations: Res<PlayerAnimations>,
+    animations: Res<PlayerAnimationNodes>,
     camera_query: Query<&Transform, (With<Camera3d>, Without<Player>)>,
     time: Res<Time>,
     mut is_moving: Local<bool>,

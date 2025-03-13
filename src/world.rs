@@ -1,5 +1,6 @@
+use avian3d::prelude::{Collider, ColliderConstructor, RigidBody};
 use bevy::{
-    gltf::GltfMeshExtras, prelude::*, scene::SceneInstanceReady, text::cosmic_text::fontdb::Query
+    gltf::GltfMeshExtras, prelude::*, scene::SceneInstanceReady, 
     // pbr::FogVolume,
 };
 
@@ -11,6 +12,25 @@ use std::{
 use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BMeshExtras {
+    pub collider: BCollider,
+    pub rigid_body: BRigidBody,
+    pub cube_size: Option<Vec3>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum BCollider {
+    TrimeshFromMesh,
+    Cubiod,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum BRigidBody {
+    Static,
+    Dynamic,
+}
 
 // Scene creation system with physics
 pub fn spawn_scene(
@@ -26,11 +46,24 @@ pub fn spawn_scene(
     // ==============================================
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
+        RigidBody::Kinematic,
         Player::default(),
+    )).with_children(|children|{
+        children.spawn((Collider::capsule(0.4, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
+    });
+
+    // ==============================================
+    // Create the ground
+    // ==============================================
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        RigidBody::Static,
+        Collider::half_space(Vec3::Y),
     ));
    
 
-    // Add some decorative objects (dynamic spheres)
+    // dynamic spheres
     let sphere_mesh = meshes.add(Sphere::new(0.8));
     
     let chrome_material = materials.add(StandardMaterial {
@@ -51,6 +84,8 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
+            RigidBody::Dynamic,
+            Collider::sphere(0.8),
         ));
     }
 
@@ -60,8 +95,8 @@ pub fn spawn_scene(
                 GltfAssetLabel::Scene(0)
                     .from_asset("models/playground.glb"),
             ),
-        ));
-        //.observe(on_level_spawn);
+        ))
+        .observe(on_level_spawn);
 
 
     /*
@@ -77,24 +112,61 @@ pub fn spawn_scene(
     */
 }
 
-/*
 fn on_level_spawn(
     trigger: Trigger<SceneInstanceReady>,
     mut commands: Commands,
     children: Query<&Children>,
     extras: Query<&GltfMeshExtras>,
-){
+) {
     for entity in
-        children.iter_descendants(trigger.entity()
-        {
-            let Ok(value) = extras.get(entity) else {
-                continue;
-            };
-            dbg!(value);
+        children.iter_descendants(trigger.entity())
+    {
+        let Ok(gltf_mesh_extras) = extras.get(entity)
+        else {
+            continue;
+        };
+        let Ok(data) = serde_json::from_str::<BMeshExtras>(
+            &gltf_mesh_extras.value,
+        ) else {
+            error!("couldn't deseralize extras");
+            continue;
+        };
+        dbg!(&data);
+        match data.collider {
+            BCollider::TrimeshFromMesh => {
+                commands.entity(entity).insert((
+                    match data.rigid_body {
+                        BRigidBody::Static => {
+                            RigidBody::Static
+                        }
+                        BRigidBody::Dynamic => {
+                            RigidBody::Dynamic
+                        }
+                    },
+                    ColliderConstructor::TrimeshFromMesh,
+                ));
+            }
+            BCollider::Cubiod => {
+                let size = data.cube_size.expect(
+                    "Cubiod collider must have cube_size",
+                );
+                commands.entity(entity).insert((
+                    match data.rigid_body {
+                        BRigidBody::Static => {
+                            RigidBody::Static
+                        }
+                        BRigidBody::Dynamic => {
+                            RigidBody::Dynamic
+                        }
+                    },
+                    Collider::cuboid(
+                        size.x, size.y, size.z,
+                    ),
+                ));
+            }
         }
-    )
+    }
 }
-*/
 
 // ==============================================
 // Some simple UI text 

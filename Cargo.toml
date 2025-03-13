@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 bevy = {version = "0.15", features=["jpeg", "meshlet", "meshlet_processor"]}
 bevy_animation_graph = {git = "https://github.com/mbrea-c/bevy_animation_graph.git"}
-avian3d = "0.2"
+avian3d = {version = "0.2", features=["debug-plugin"]}
 bevy-tnua = "0.21"
 bevy_ui = "0.15.3"
 bevy_lunex = {version = "*"}

@@ -44,7 +44,7 @@ fn main() {
             MeshletPlugin{
                 cluster_buffer_slots: 8192,
             },
-
+            physics::AvPhysicsPlugin,
             player::PlayerPlugin,
             camera::CameraPlugin,
             world::WorldPlugin,
