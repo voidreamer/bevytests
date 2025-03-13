@@ -1,8 +1,13 @@
 use bevy::{
-    prelude::*,
+    gltf::GltfMeshExtras, prelude::*, scene::SceneInstanceReady, text::cosmic_text::fontdb::Query
     // pbr::FogVolume,
 };
-use bevy_rapier3d::prelude::*;
+
+use serde::{Deserialize, Serialize};
+use std::{
+    f32::consts::{FRAC_PI_4, PI},
+    time::Duration,
+};
 use crate::player::Player;
 
 const CHARACTER_PATH: &str = "models/character.glb";
@@ -22,17 +27,7 @@ pub fn spawn_scene(
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
         Player::default(),
-    ))
-    .insert(RigidBody::KinematicPositionBased)
-    .insert(Collider::capsule_y(1.0, 0.3))
-    .insert(KinematicCharacterController{
-        offset: CharacterLength::Absolute(0.01),
-        ..default()
-    })
-    .insert(Velocity{
-        linvel: Vec3::new(0.0, 0.3, 0.0),
-        angvel: Vec3::new(0.2, 0.0, 0.0),
-    });
+    ));
    
 
     // Add some decorative objects (dynamic spheres)
@@ -56,17 +51,18 @@ pub fn spawn_scene(
             Mesh3d(sphere_mesh.clone()),
             MeshMaterial3d(chrome_material.clone()),
             Transform::from_xyz(x, 1.0, z),
-        ))
-        .insert(RigidBody::Dynamic)
-        .insert(Velocity{
-            linvel: Vec3::new(0.0, 0.3, 0.0),
-            angvel: Vec3::new(0.2, 0.0, 0.0),
-        })
-        .insert(Collider::ball(1.0))
-        .insert(GravityScale(2.0))
-        .insert(Ccd::enabled())
-        .insert(Restitution::coefficient(0.8));
+        ));
     }
+
+    commands
+        .spawn(SceneRoot(
+            asset_server.load(
+                GltfAssetLabel::Scene(0)
+                    .from_asset("models/playground.glb"),
+            ),
+        ));
+        //.observe(on_level_spawn);
+
 
     /*
     // Testing some assets
@@ -81,22 +77,24 @@ pub fn spawn_scene(
     */
 }
 
-// ==============================================
-// Physics setup
-// ==============================================
-
-fn setup_physics(mut commands: Commands) {
-    commands
-        .spawn(Collider::cuboid(100.0, 0.1, 100.0))
-        .insert(Transform::from_xyz(0.0, -0.1, 0.0));
-
-    commands
-        .spawn(RigidBody::Dynamic)
-        .insert(Collider::ball(0.5))
-        .insert(Transform::from_xyz(0.0, 5.0, 0.0))
-        .insert(Restitution::coefficient(0.7));
+/*
+fn on_level_spawn(
+    trigger: Trigger<SceneInstanceReady>,
+    mut commands: Commands,
+    children: Query<&Children>,
+    extras: Query<&GltfMeshExtras>,
+){
+    for entity in
+        children.iter_descendants(trigger.entity()
+        {
+            let Ok(value) = extras.get(entity) else {
+                continue;
+            };
+            dbg!(value);
+        }
+    )
 }
-
+*/
 
 // ==============================================
 // Some simple UI text 
@@ -115,14 +113,7 @@ fn spawn_text(commands: &mut Commands){
 }
 fn create_help_text() -> Text {
     format!(
-        "Lavid and Vlare adventures\n
-WASD: Move player\n
-Space: Jump\n
-Mouse: Control camera\n
-Mouse Wheel: Zoom in/out\n
-Mouse Left Click: Attack!\n
-Watch your stamina :P\n
-ESC: Exit game\n",
+        "ESC: Exit game\n",
     )
     .into()
 }
@@ -135,10 +126,6 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Startup, spawn_scene)
-            .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())        
-            .add_plugins(RapierDebugRenderPlugin::default())
-            .add_systems(Startup, setup_physics);
+            app.add_systems(Startup, (setup, spawn_scene));
     }
 }

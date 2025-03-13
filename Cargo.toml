@@ -6,11 +6,15 @@ edition = "2021"
 [dependencies]
 bevy = {version = "0.15", features=["jpeg", "meshlet", "meshlet_processor"]}
 bevy_animation_graph = {git = "https://github.com/mbrea-c/bevy_animation_graph.git"}
-bevy_rapier3d = { version = "0.29.0", features = ["simd-stable", "debug-render-3d"]}
+avian3d = "0.2"
+bevy-tnua = "0.21"
 bevy_ui = "0.15.3"
 bevy_lunex = {version = "*"}
 ghx_proc_gen = "0.4.0"
 bevy_hanabi = { version = "0.14", default-features = true, features = [ "3d", "serde" ] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+bevy-tnua-avian3d = "0.2.0"
 
 [dependencies.gltf]
 version = "1"

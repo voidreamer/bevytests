@@ -284,6 +284,7 @@ pub fn keyboard_movement_control(
                     timer.reset();
                 }
                 
+                /*
                 // Apply a quick movement in the direction the player is facing
                 if any_movement {
                     // Roll in movement direction
@@ -293,6 +294,7 @@ pub fn keyboard_movement_control(
                     let forward_dir = transform.forward();
                     transform.translation += forward_dir * 2.0;
                 }
+                */
                 
                 continue;
             }
@@ -309,7 +311,7 @@ pub fn keyboard_movement_control(
                 }
             }
             
-            // Check for new jump input (Ctrl key)
+            // Check for jump input (Ctrl key)
             if keyboard_input.just_pressed(KeyCode::ControlLeft) && 
                !*is_attacking && !*is_jumping && !*is_rolling && 
                player.stamina >= 20.0 && !player.exhausted {

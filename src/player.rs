@@ -66,7 +66,7 @@ fn player_controller(
     } else {
         None
     };
-    
+    /* 
     for (mut player, mut transform) in player_query.iter_mut() {
         // Default to keep existing velocity but apply gravity
         let mut direction = Vec3::ZERO;
@@ -224,6 +224,7 @@ fn player_controller(
             );
         }
     }
+    */
 }
 
 // Debug system for health regeneration over time

@@ -21,7 +21,7 @@ fn setup(
       mut materials: ResMut<Assets<AuroraShaderMaterial>>,
 ){
       commands.spawn((
-            Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
+            Mesh3d(meshes.add(Cuboid::default())),
             MeshMaterial3d(materials.add(AuroraShaderMaterial {})),
             Transform::from_xyz(0.0, 0.0, 0.0),
       ));

@@ -3,8 +3,6 @@ use bevy::{
     pbr::experimental::meshlet::MeshletPlugin,
     window::{CursorGrabMode, CursorOptions, Window, WindowResolution},
 };
-use bevy_lunex::{UiLunexDebugPlugin, UiLunexPlugin};
-use bevy_hanabi::*;
 
 mod player;
 mod camera;
@@ -14,21 +12,13 @@ mod animation;
 mod ui;
 mod menu;
 mod fx;
+mod physics;
 mod shader;
 
 fn main() {
     println!("Starting Third-Person Example...");
     println!("Controls:");
-    println!("  - WASD: Move player");
-    println!("  - Space: Jump");
-    println!("  - Mouse: Control camera");
-    println!("  - Mouse Wheel: Zoom in/out");
     println!("  - ESC: Exit game");
-    println!("  - 1/2/3: Switch animations");
-    println!("  - P: Pause/Resume animation");
-    println!("  - Arrow Keys: Control animation playback");
-    println!("  - H/J: Decrease/Increase health");
-    println!("  - S: Add souls (100)");
     
     App::new()
         .add_plugins(DefaultPlugins
@@ -51,23 +41,19 @@ fn main() {
             .set(ImagePlugin::default_nearest()))
         // Add our third-person game plugin
         .add_plugins((
+            MeshletPlugin{
+                cluster_buffer_slots: 8192,
+            },
+
             player::PlayerPlugin,
             camera::CameraPlugin,
             world::WorldPlugin,
-            menu::MenuPlugin,// This one doesnt work yet
+            // menu::MenuPlugin,// This one doesnt work yet
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
             // fx::FXPlugin, // Disable til this works.
             ui::UIPlugin, 
             shader::ShaderPlugin, 
-
-            MeshletPlugin{
-                cluster_buffer_slots: 8192,
-            },
-
-            HanabiPlugin, // This one is for GPU Fx
-            UiLunexPlugin,
-            UiLunexDebugPlugin::<1, 2>
         ))
         // Set a dark sky color
         .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))

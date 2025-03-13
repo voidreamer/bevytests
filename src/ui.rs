@@ -3,6 +3,7 @@ use bevy::{
     input::keyboard::KeyCode,
 };
 use crate::player::Player;
+use bevy_lunex::{UiLunexDebugPlugin, UiLunexPlugin};
 
 // UI Resource to track game state
 #[derive(Resource)]
@@ -610,6 +611,7 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GameUI>()
+           .add_plugins(UiLunexPlugin)
            .add_systems(Startup, setup_ui)
            .add_systems(Update, (
                update_game_state,

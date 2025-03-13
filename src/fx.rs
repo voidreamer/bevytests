@@ -5,6 +5,7 @@ use std::f32::consts::PI;
 
 use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*};
 use bevy_hanabi::prelude::*;
+use bevy_hanabi::*;
 
 
 #[derive(Component)]
@@ -139,7 +140,9 @@ fn setup(
 
 impl Plugin for FXPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup);
+        app
+        .add_plugins(HanabiPlugin)
+        .add_systems(Startup, setup);
     }
 }
 */
