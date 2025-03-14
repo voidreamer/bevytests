@@ -264,6 +264,7 @@ fn setup_player(
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
         LockedAxes::ROTATION_LOCKED.unlock_rotation_y(),
         Player::default(),
+        Transform::from_xyz(0.0, 2.0, 0.0), // Initial position slightly above ground
     )).with_children(|children|{
         children.spawn((Collider::capsule(0.5, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
     });

@@ -494,7 +494,7 @@ fn apply_controls(
         desired_forward: Dir3::new(forward_dir).ok(),
         // The `float_height` must be greater (even if by little) from the distance between the
         // character's center and the lowest point of its collider.
-        float_height: 2.0,
+        float_height: 0.1,
         // `TnuaBuiltinWalk` has many other fields for customizing the movement - but they have
         // sensible defaults. Refer to the `TnuaBuiltinWalk`'s documentation to learn what they do.
         ..Default::default()
@@ -505,14 +505,25 @@ fn apply_controls(
     if keyboard.pressed(KeyCode::ControlLeft) {
         controller.action(TnuaBuiltinJump{
             // The height is the only mandatory field of the jump button.
-            height: 4.0,
+            height: 2.0,
             // `TnuaBuiltinJump` also has customization fields with sensible defaults.
             ..Default::default()
         });
     }
 
     if keyboard.pressed(KeyCode::Space) {
+        // Get the movement direction based on what direction player is going
+        let dash_direction = if direction != Vec3::ZERO {
+            // Use player's current movement direction
+            direction.normalize()
+        } else {
+            // If standing still, dash forward relative to camera
+            camera_forward
+        };
+        
         controller.action(TnuaBuiltinDash{
+            displacement: dash_direction * 3.0, // Increased distance
+            speed: 5.0, // Increased speed
             ..Default::default()
         });
     }
@@ -561,6 +572,7 @@ fn handle_animating(
                 TnuaBuiltinJumpState::FallSection => PlayerAnimationState::Falling,
             }
         }
+        Some(TnuaBuiltinDash::NAME) => PlayerAnimationState::Rolling,
         // Tnua should only have the `action_name` of the actions you feed to it. If it has
         // anything else - consider it a bug.
         Some(other) => panic!("Unknown action {other}"),
