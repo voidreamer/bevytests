@@ -35,6 +35,14 @@ pub struct PlayerAnimationNodes {
     pub fall: AnimationNodeIndex,  
 }
 
+// Marker component for animations that use root motion
+#[derive(Component)]
+pub struct RootMotionAnimation {
+    pub enabled: bool,
+    pub previous_root_transform: Option<Transform>,
+    pub motion_strength: f32,
+}
+
 // Setup animations with the new structure
 pub fn setup_animations(
     handle: Option<Res<PlayerGltfHandle>>,
@@ -361,13 +369,25 @@ pub fn keyboard_movement_control(
 */
 fn apply_controls(
     keyboard: Res<ButtonInput<KeyCode>>, 
+    mouse_input: Res<ButtonInput<MouseButton>>,
     mut query: Query<(&mut TnuaController, &mut Player)>,
     camera_query: Query<&Transform, With<Camera3d>>,
     time: Res<Time>,
+    mut attack_timer: Local<Option<Timer>>,
 ) {
     let Ok((mut controller, mut player)) = query.get_single_mut() else {
         return;
     };
+    
+    // Initialize attack timer if needed
+    if attack_timer.is_none() {
+        *attack_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
+    }
+    
+    // Handle attack timer
+    if let Some(timer) = attack_timer.as_mut() {
+        timer.tick(time.delta());
+    }
 
     // Get camera for movement direction
     let camera_transform = if let Ok(camera) = camera_query.get_single() {
@@ -494,7 +514,7 @@ fn apply_controls(
         });
     }
 
-    if keyboard.pressed(KeyCode::Space) && player.stamina >= 10.0 && !player.exhausted {
+    if keyboard.pressed(KeyCode::Space) && player.stamina >= 10.0 && !player.exhausted && !player.is_attacking {
         // Use stamina for rolling
         player.stamina = (player.stamina - 1.0).max(0.0);
         
@@ -513,18 +533,39 @@ fn apply_controls(
             ..Default::default()
         });
     }
+    
+    // Handle attack action with left mouse button
+    if mouse_input.just_pressed(MouseButton::Left) && player.stamina >= 15.0 && !player.exhausted && !player.is_attacking {
+        // Start attack
+        player.is_attacking = true;
+        
+        // Use stamina for attack
+        player.stamina = (player.stamina - 15.0).max(0.0);
+        
+        // Set attack timer
+        if let Some(timer) = attack_timer.as_mut() {
+            timer.set_duration(Duration::from_secs_f32(1.0)); // Attack animation duration
+            timer.reset();
+        }
+    }
+    
+    // Reset attack state when timer finishes
+    if let Some(timer) = attack_timer.as_ref() {
+        if timer.just_finished() && player.is_attacking {
+            player.is_attacking = false;
+        }
+    }
 }
 
 fn handle_animating(
-    mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>)>,
-    player_exhaustion_query: Query<&Player>,
+    mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>, &Player)>,
     mut animation_query: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animation_nodes: Option<Res<PlayerAnimationNodes>>,
     keyboard: Res<ButtonInput<KeyCode>>, 
 ) {
     // An actual game should match the animation player and the controller. Here we cheat for
     // simplicity and use the only controller and only player.
-    let Ok((controller, mut animating_state)) = player_query.get_single_mut() else {
+    let Ok((controller, mut animating_state, player)) = player_query.get_single_mut() else {
         return;
     };
     let Ok((mut animation_player, mut transitions)) = animation_query.get_single_mut() else {
@@ -548,13 +589,19 @@ fn handle_animating(
     let fall_transition = Duration::from_secs_f32(0.15);
     let attack_transition = Duration::from_secs_f32(0.1);
     let roll_transition = Duration::from_secs_f32(0.1);
+    
+    // Note: In a more comprehensive implementation, we'd use animation blend spaces
+    // to blend between different movement animations based on direction and speed
 
     // Here we use the data from TnuaController to determine what the character is currently doing,
     // so that we can later use that information to decide which animation to play.
 
     // First we look at the `action_name` to determine which action (if at all) the character is
-    // currently performing:
-    let current_status_for_animating = match controller.action_name() {
+    // currently performing, but check for attack state first - it has highest priority
+    let current_status_for_animating = if player.is_attacking {
+        PlayerAnimationState::Attacking
+    } else {
+        match controller.action_name() {
         // Unless you provide the action names yourself, prefer matching against the `NAME` const
         // of the `TnuaAction` trait. Once `type_name` is stabilized as `const` Tnua will use it to
         // generate these names automatically, which may result in a change to the name.
@@ -566,7 +613,7 @@ fn handle_animating(
             // Depending on the state of the jump, we need to decide if we want to play the jump
             // animation or the fall animation.
             match jump_state {
-                TnuaBuiltinJumpState::NoJump => return,
+                TnuaBuiltinJumpState::NoJump => PlayerAnimationState::Idling,
                 TnuaBuiltinJumpState::StartingJump { .. } => PlayerAnimationState::Jumping,
                 TnuaBuiltinJumpState::SlowDownTooFastSlopeJump { .. } => PlayerAnimationState::Jumping,
                 TnuaBuiltinJumpState::MaintainingJump => PlayerAnimationState::Jumping,
@@ -597,28 +644,20 @@ fn handle_animating(
             } else {
                 let speed = basis_state.running_velocity.length();
                 if 0.01 < speed {
-                    // Check if player is exhausted - use walk animation regardless of shift key
-                    if let Ok(player) = player_exhaustion_query.get_single() {
-                        if player.exhausted {
-                            PlayerAnimationState::Walking
-                        } else if keyboard.pressed(KeyCode::ShiftLeft) {
-                            PlayerAnimationState::Running
-                        } else {
-                            PlayerAnimationState::Walking
-                        }
+                    // Use player state from the query
+                    if player.exhausted {
+                        PlayerAnimationState::Walking
+                    } else if keyboard.pressed(KeyCode::ShiftLeft) {
+                        PlayerAnimationState::Running
                     } else {
-                        // Fallback if player query fails
-                        if keyboard.pressed(KeyCode::ShiftLeft) {
-                            PlayerAnimationState::Running
-                        } else {
-                            PlayerAnimationState::Walking
-                        }
+                        PlayerAnimationState::Walking
                     }
                 } else {
                     PlayerAnimationState::Idling
                 }
             }
         }
+    }
     };
 
     let animating_directive = animating_state.update_by_discriminant(current_status_for_animating);
@@ -633,15 +672,13 @@ fn handle_animating(
             // player.
             if let PlayerAnimationState::Running = state {
                 if let Some(_) = animation_player.animation_mut(animation_nodes.run) {
-                    // Check if player is exhausted using our dedicated query
-                    if let Ok(player) = player_exhaustion_query.get_single() {
-                        if player.exhausted {
-                            // Use transition when going from running to walking due to exhaustion
-                            transitions
-                                .play(&mut animation_player, animation_nodes.walk, walk_transition)
-                                .set_speed(0.6)  // Slower speed when exhausted
-                                .repeat();
-                        }
+                    // Check if player is exhausted
+                    if player.exhausted {
+                        // Use transition when going from running to walking due to exhaustion
+                        transitions
+                            .play(&mut animation_player, animation_nodes.walk, walk_transition)
+                            .set_speed(0.6)  // Slower speed when exhausted
+                            .repeat();
                     }
                 }
             }
@@ -759,6 +796,52 @@ fn handle_animating(
     }
 }
 
+// Apply root motion from animations to character movement
+fn apply_root_motion(
+    time: Res<Time>,
+    mut player_query: Query<(&mut Transform, &Player, &mut RootMotionAnimation)>,
+    animation_query: Query<&Transform, (With<SceneRoot>, Without<Player>)>,
+) {
+    // Only apply root motion to enabled animations
+    for (mut transform, player, mut root_motion) in player_query.iter_mut() {
+        if !root_motion.enabled {
+            continue;
+        }
+        
+        // Find the animation root node's transform
+        for scene_transform in animation_query.iter() {
+            // First time setup - store initial transform
+            if root_motion.previous_root_transform.is_none() {
+                root_motion.previous_root_transform = Some(*scene_transform);
+                continue;
+            }
+            
+            // Calculate the movement delta from the previous frame
+            let prev_transform = root_motion.previous_root_transform.unwrap_or(*scene_transform);
+            let motion_delta = scene_transform.translation - prev_transform.translation;
+            
+            // Don't apply vertical motion from animations - physics should handle that
+            let planar_delta = Vec3::new(motion_delta.x, 0.0, motion_delta.z);
+            
+            // Only apply root motion for certain animations
+            let motion_factor = if player.is_attacking || player.is_moving {
+                root_motion.motion_strength * time.delta_secs() * 60.0
+            } else {
+                0.0
+            };
+            
+            // Apply the motion to the actual transform
+            transform.translation += planar_delta * motion_factor;
+            
+            // Store current transform for next frame
+            root_motion.previous_root_transform = Some(*scene_transform);
+            
+            // Only process first scene transform
+            break;
+        }
+    }
+}
+
 // Initialize player animations once the animation nodes are loaded
 fn initialize_player_animations(
     animations: Option<Res<PlayerAnimationNodes>>,
@@ -796,7 +879,8 @@ impl Plugin for PlayerAnimationPlugin {
                 setup_animations,
                 initialize_player_animations,
                 handle_animating,
-            ),
-        );
+            ))
+            // Add root motion system after animation updates
+            .add_systems(PostUpdate, apply_root_motion);
     }
 }

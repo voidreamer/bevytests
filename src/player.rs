@@ -5,13 +5,14 @@ use bevy::{
 use bevy_tnua::{prelude::TnuaController, TnuaAnimatingState};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::camera::ThirdPersonCamera;
-use crate::animation::PlayerAnimationState;
+use crate::animation::{PlayerAnimationState, RootMotionAnimation};
 
 const CHARACTER_PATH: &str = "models/character.glb";
 
 #[derive(Component)]
 pub struct Player {
     pub is_moving: bool,
+    pub is_attacking: bool,    // Flag for attack animation state
     
     // Added for UI
     pub health: f32,
@@ -28,6 +29,7 @@ impl Default for Player {
     fn default() -> Self {
         Self {
             is_moving: false,
+            is_attacking: false,
             
             // Stats for UI
             health: 100.0,
@@ -91,6 +93,11 @@ fn setup_player(
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
         LockedAxes::ROTATION_LOCKED.unlock_rotation_y(),
         Player::default(),
+        RootMotionAnimation {
+            enabled: true,
+            previous_root_transform: None,
+            motion_strength: 0.6, // Adjust strength of root motion (0.0 - 1.0)
+        },
         Transform::from_xyz(0.0, 2.0, 0.0), // Initial position slightly above ground
     )).with_children(|children|{
         children.spawn((Collider::capsule(0.5, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
