@@ -5,7 +5,12 @@ use bevy::{
 use bevy_tnua::{prelude::TnuaController, TnuaAnimatingState};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::camera::ThirdPersonCamera;
-use crate::animation::{PlayerAnimationState, RootMotionAnimation};
+use crate::animation::{
+    PlayerAnimationState, 
+    RootMotionAnimation, 
+    AnimationStateMachine,
+    AnimationCancellation
+};
 
 const CHARACTER_PATH: &str = "models/character.glb";
 
@@ -98,6 +103,8 @@ fn setup_player(
             previous_root_transform: None,
             motion_strength: 0.6, // Adjust strength of root motion (0.0 - 1.0)
         },
+        AnimationStateMachine::new(), // Add our state machine
+        AnimationCancellation::default(), // Add cancellation component
         Transform::from_xyz(0.0, 2.0, 0.0), // Initial position slightly above ground
     )).with_children(|children|{
         children.spawn((Collider::capsule(0.5, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));

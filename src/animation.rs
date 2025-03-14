@@ -12,15 +12,143 @@ use std::time::Duration;
 use crate::player::{Player, PlayerGltfHandle};
 
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum AttackDirection {
+    Forward,
+    Left,
+    Right,
+    Backward
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PlayerAnimationState {
     Tpose,
     Idling,
     Jumping,
     Running,
-    Attacking,
+    // Holds combo stage (0-2) and attack direction
+    Attacking(u8, AttackDirection), 
     Rolling,
     Walking,
     Falling
+}
+
+// Animation state machine to handle complex transitions and interrupts
+#[derive(Component)]
+pub struct AnimationStateMachine {
+    // Current state of animations
+    pub current_state: PlayerAnimationState,
+    pub previous_state: Option<PlayerAnimationState>,
+    
+    // Transition config
+    pub interruptible: bool,
+    pub transition_progress: f32,
+    
+    // Combo system
+    pub combo_count: u8,
+    pub combo_window_active: bool,
+    pub combo_window_timer: f32,
+    pub max_combo_chain: u8,
+}
+
+impl AnimationStateMachine {
+    pub fn new() -> Self {
+        Self {
+            current_state: PlayerAnimationState::Idling,
+            previous_state: None,
+            interruptible: true,
+            transition_progress: 0.0,
+            combo_count: 0,
+            combo_window_active: false,
+            combo_window_timer: 0.0,
+            max_combo_chain: 3, // Support for 3-hit combo
+        }
+    }
+    
+    // Try to transition to new state, respecting interruption rules
+    pub fn try_transition(&mut self, new_state: PlayerAnimationState, cancellation: Option<&AnimationCancellation>) -> bool {
+        // Always allow transition if current state is interruptible
+        if self.interruptible {
+            self.previous_state = Some(self.current_state);
+            self.current_state = new_state;
+            self.transition_progress = 0.0;
+            return true;
+        }
+        
+        // Check if animation can be canceled via the cancellation system
+        if let Some(cancel_info) = cancellation {
+            if cancel_info.cancelable && cancel_info.current_time >= cancel_info.cancelable_after_time {
+                // Check if current state can be canceled into the requested state
+                if cancel_info.can_cancel_into.contains(&new_state) {
+                    self.previous_state = Some(self.current_state);
+                    self.current_state = new_state;
+                    self.transition_progress = 0.0;
+                    return true;
+                }
+            }
+        }
+        
+        // Special case for attack combos
+        if let PlayerAnimationState::Attacking(combo_stage, _) = self.current_state {
+            if self.combo_window_active {
+                if let PlayerAnimationState::Attacking(_, direction) = new_state {
+                    // Advance combo if in window
+                    let next_combo = (combo_stage + 1).min(self.max_combo_chain - 1);
+                    self.previous_state = Some(self.current_state);
+                    // Use the direction from the new attack input
+                    self.current_state = PlayerAnimationState::Attacking(next_combo, direction);
+                    self.combo_count = next_combo;
+                    self.combo_window_active = false;
+                    return true;
+                }
+            }
+        }
+        
+        // Could not transition
+        false
+    }
+    
+    // Start a combo window - time during which next attack can be chained
+    pub fn start_combo_window(&mut self, window_duration: f32) {
+        self.combo_window_active = true;
+        self.combo_window_timer = window_duration;
+    }
+    
+    // Update combo window timer
+    pub fn update(&mut self, delta_time: f32) {
+        if self.combo_window_active {
+            self.combo_window_timer -= delta_time;
+            if self.combo_window_timer <= 0.0 {
+                self.combo_window_active = false;
+                
+                // Reset combo if window expires
+                if let PlayerAnimationState::Attacking(_, _) = self.current_state {
+                    // Only reset if we're still in attack state and window closes
+                    if !self.interruptible {
+                        // Wait for animation to finish if not interruptible
+                    } else {
+                        self.combo_count = 0;
+                    }
+                } else {
+                    self.combo_count = 0;
+                }
+            }
+        }
+        
+        // Update transition progress
+        self.transition_progress += delta_time;
+    }
+    
+    // Set whether current animation can be interrupted
+    pub fn set_interruptible(&mut self, interruptible: bool) {
+        self.interruptible = interruptible;
+    }
+    
+    // Reset combo counter
+    pub fn reset_combo(&mut self) {
+        self.combo_count = 0;
+        self.combo_window_active = false;
+    }
 }
 
 #[derive(Resource)]
@@ -29,7 +157,9 @@ pub struct PlayerAnimationNodes {
     pub tpose: AnimationNodeIndex,
     pub jump: AnimationNodeIndex,
     pub run: AnimationNodeIndex,
-    pub attack: AnimationNodeIndex,
+    pub attack: AnimationNodeIndex,      // First attack in combo (slash)
+    pub attack2: AnimationNodeIndex,     // Second attack in combo (could be different move)
+    pub attack3: AnimationNodeIndex,     // Third attack in combo (could be stronger finisher)
     pub roll: AnimationNodeIndex,  
     pub walk: AnimationNodeIndex,  
     pub fall: AnimationNodeIndex,  
@@ -41,6 +171,16 @@ pub struct RootMotionAnimation {
     pub enabled: bool,
     pub previous_root_transform: Option<Transform>,
     pub motion_strength: f32,
+}
+
+// Component to track which animations can be canceled and into what states
+#[derive(Component, Default)]
+pub struct AnimationCancellation {
+    pub cancelable: bool,
+    pub cancelable_after_time: f32,  // Time after which animation can be canceled (seconds)
+    pub current_time: f32,           // Current time in animation
+    pub priority: u8,                // Priority of current animation (higher can cancel lower)
+    pub can_cancel_into: Vec<PlayerAnimationState>,  // States this animation can cancel into
 }
 
 // Setup animations with the new structure
@@ -72,6 +212,10 @@ pub fn setup_animations(
     let mut graph = AnimationGraph::new();
     let root_node = graph.root;
 
+    // For simplicity, we'll reuse the slash animation for each combo stage
+    // In a real game, you would have separate animations for each stage
+    let slash_anim = gltf.named_animations["slash"].clone();
+    
     commands.insert_resource(PlayerAnimationNodes{
         tpose: graph.add_clip(gltf.named_animations["tpose"].clone(), 1.0, root_node),
         idle: graph.add_clip(gltf.named_animations["idle"].clone(), 1.0, root_node),
@@ -79,7 +223,11 @@ pub fn setup_animations(
         walk: graph.add_clip(gltf.named_animations["walk"].clone(), 1.0, root_node),
         run: graph.add_clip(gltf.named_animations["run"].clone(), 1.0, root_node),
         jump: graph.add_clip(gltf.named_animations["jump"].clone(), 1.0, root_node),
-        attack: graph.add_clip(gltf.named_animations["slash"].clone(), 1.0, root_node),
+        attack: graph.add_clip(slash_anim.clone(), 1.0, root_node),
+        // For demo purposes, we'll use the same slash animation for all combo stages
+        // with different playback speeds to simulate different attacks
+        attack2: graph.add_clip(slash_anim.clone(), 1.0, root_node),
+        attack3: graph.add_clip(slash_anim.clone(), 1.0, root_node),
         fall: graph.add_clip(gltf.named_animations["fall"].clone(), 1.0, root_node),
     });
 
@@ -370,23 +518,82 @@ pub fn keyboard_movement_control(
 fn apply_controls(
     keyboard: Res<ButtonInput<KeyCode>>, 
     mouse_input: Res<ButtonInput<MouseButton>>,
-    mut query: Query<(&mut TnuaController, &mut Player)>,
+    mut query: Query<(&mut TnuaController, &mut Player, &mut AnimationStateMachine, &mut AnimationCancellation)>,
     camera_query: Query<&Transform, With<Camera3d>>,
     time: Res<Time>,
     mut attack_timer: Local<Option<Timer>>,
+    mut combo_window_timer: Local<Option<Timer>>,
 ) {
-    let Ok((mut controller, mut player)) = query.get_single_mut() else {
+    let Ok((mut controller, mut player, mut state_machine, mut anim_cancellation)) = query.get_single_mut() else {
         return;
     };
     
-    // Initialize attack timer if needed
+    // Initialize timers if needed
     if attack_timer.is_none() {
         *attack_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
     }
     
-    // Handle attack timer
+    if combo_window_timer.is_none() {
+        *combo_window_timer = Some(Timer::new(Duration::from_secs_f32(0.0), TimerMode::Once));
+    }
+    
+    // Handle timers
     if let Some(timer) = attack_timer.as_mut() {
         timer.tick(time.delta());
+        
+        // Update the animation cancellation system's time tracking
+        if player.is_attacking {
+            anim_cancellation.current_time += time.delta_secs();
+            
+            // Make attacks cancelable after a certain time (0.3 seconds)
+            if anim_cancellation.current_time >= 0.3 && !anim_cancellation.cancelable {
+                anim_cancellation.cancelable = true;
+                anim_cancellation.cancelable_after_time = 0.3;
+                
+                // Set which states this attack can be canceled into
+                anim_cancellation.can_cancel_into = vec![
+                    PlayerAnimationState::Rolling,
+                    PlayerAnimationState::Jumping,
+                    // Add directions to make the compiler happy with the complex enum
+                    PlayerAnimationState::Attacking(0, AttackDirection::Forward), 
+                    PlayerAnimationState::Attacking(0, AttackDirection::Left),
+                    PlayerAnimationState::Attacking(0, AttackDirection::Right),
+                    PlayerAnimationState::Attacking(0, AttackDirection::Backward),
+                ];
+            }
+        }
+        
+        // Attack animation finished
+        if timer.just_finished() && player.is_attacking {
+            player.is_attacking = false;
+            state_machine.set_interruptible(true);
+            
+            // Reset animation cancellation state
+            anim_cancellation.cancelable = false;
+            anim_cancellation.current_time = 0.0;
+            
+            // Start combo window after attack finishes
+            if let PlayerAnimationState::Attacking(combo, _) = state_machine.current_state {
+                if combo < state_machine.max_combo_chain - 1 {
+                    // Only open combo window if we haven't reached max combo
+                    if let Some(combo_timer) = combo_window_timer.as_mut() {
+                        combo_timer.set_duration(Duration::from_secs_f32(0.5)); // 0.5s combo window
+                        combo_timer.reset();
+                        state_machine.start_combo_window(0.5);
+                    }
+                } else {
+                    // Reset combo after final hit
+                    state_machine.reset_combo();
+                }
+            }
+        }
+    }
+    
+    if let Some(timer) = combo_window_timer.as_mut() {
+        timer.tick(time.delta());
+        
+        // Update state machine timer
+        state_machine.update(time.delta_secs());
     }
 
     // Get camera for movement direction
@@ -535,37 +742,97 @@ fn apply_controls(
     }
     
     // Handle attack action with left mouse button
-    if mouse_input.just_pressed(MouseButton::Left) && player.stamina >= 15.0 && !player.exhausted && !player.is_attacking {
-        // Start attack
-        player.is_attacking = true;
+    if mouse_input.just_pressed(MouseButton::Left) && player.stamina >= 15.0 && !player.exhausted {
+        let in_combo_window = state_machine.combo_window_active;
         
-        // Use stamina for attack
-        player.stamina = (player.stamina - 15.0).max(0.0);
-        
-        // Set attack timer
-        if let Some(timer) = attack_timer.as_mut() {
-            timer.set_duration(Duration::from_secs_f32(1.0)); // Attack animation duration
-            timer.reset();
-        }
-    }
-    
-    // Reset attack state when timer finishes
-    if let Some(timer) = attack_timer.as_ref() {
-        if timer.just_finished() && player.is_attacking {
-            player.is_attacking = false;
+        if !player.is_attacking || in_combo_window || anim_cancellation.cancelable {
+            // Determine attack direction based on movement keys
+            let attack_direction = determine_attack_direction(&keyboard, &camera_transform.rotation);
+            
+            // Determine combo stage
+            let combo_stage = if in_combo_window {
+                // This will be a combo continuation
+                if let PlayerAnimationState::Attacking(current_stage, _) = state_machine.current_state {
+                    (current_stage + 1).min(state_machine.max_combo_chain - 1)
+                } else {
+                    0 // Shouldn't reach here, but just in case
+                }
+            } else {
+                // This is a new attack
+                0
+            };
+            
+            // Try to transition to attacking state with direction
+            let new_state = PlayerAnimationState::Attacking(combo_stage, attack_direction);
+            
+            if state_machine.try_transition(new_state, Some(&anim_cancellation)) {
+                player.is_attacking = true;
+                
+                // Use stamina for attack (costs more for later combo stages)
+                let stamina_cost = 15.0 + (combo_stage as f32 * 5.0);
+                player.stamina = (player.stamina - stamina_cost).max(0.0);
+                
+                // Make animation non-interruptible at start
+                state_machine.set_interruptible(false);
+                
+                // Reset cancellation system for new attack
+                anim_cancellation.cancelable = false;
+                anim_cancellation.current_time = 0.0;
+                
+                // Set attack timer - duration depends on combo stage
+                if let Some(timer) = attack_timer.as_mut() {
+                    // Each successive attack in combo is slightly faster
+                    let duration = match combo_stage {
+                        0 => 1.0,     // First attack: 1 second
+                        1 => 0.8,     // Second attack: 0.8 seconds
+                        _ => 0.6,     // Third attack: 0.6 seconds (faster finisher)
+                    };
+                    
+                    timer.set_duration(Duration::from_secs_f32(duration));
+                    timer.reset();
+                }
+                
+                // Close combo window since we used it
+                if in_combo_window {
+                    state_machine.combo_window_active = false;
+                }
+            }
         }
     }
 }
 
+// Helper function to determine attack direction based on keyboard input
+fn determine_attack_direction(keyboard: &ButtonInput<KeyCode>, _rotation: &Quat) -> AttackDirection {
+    let forward_pressed = keyboard.pressed(KeyCode::KeyW);
+    let backward_pressed = keyboard.pressed(KeyCode::KeyS);
+    let left_pressed = keyboard.pressed(KeyCode::KeyA);
+    let right_pressed = keyboard.pressed(KeyCode::KeyD);
+    
+    // Determine direction based on which keys are pressed
+    if forward_pressed && !backward_pressed && !left_pressed && !right_pressed {
+        AttackDirection::Forward
+    } else if backward_pressed && !forward_pressed && !left_pressed && !right_pressed {
+        AttackDirection::Backward
+    } else if left_pressed && !right_pressed && !forward_pressed && !backward_pressed {
+        AttackDirection::Left
+    } else if right_pressed && !left_pressed && !forward_pressed && !backward_pressed {
+        AttackDirection::Right
+    } else {
+        // Default to forward attack when no direction keys or multiple direction keys are pressed
+        // Could be enhanced to use camera/player facing instead
+        AttackDirection::Forward
+    }
+}
+
 fn handle_animating(
-    mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>, &Player)>,
+    mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>, &Player, &AnimationStateMachine, &AnimationCancellation)>,
     mut animation_query: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animation_nodes: Option<Res<PlayerAnimationNodes>>,
     keyboard: Res<ButtonInput<KeyCode>>, 
 ) {
     // An actual game should match the animation player and the controller. Here we cheat for
     // simplicity and use the only controller and only player.
-    let Ok((controller, mut animating_state, player)) = player_query.get_single_mut() else {
+    let Ok((controller, mut animating_state, player, state_machine, _animation_cancellation)) = player_query.get_single_mut() else {
         return;
     };
     let Ok((mut animation_player, mut transitions)) = animation_query.get_single_mut() else {
@@ -596,11 +863,18 @@ fn handle_animating(
     // Here we use the data from TnuaController to determine what the character is currently doing,
     // so that we can later use that information to decide which animation to play.
 
-    // First we look at the `action_name` to determine which action (if at all) the character is
-    // currently performing, but check for attack state first - it has highest priority
+    // Use the state machine as source of truth for animation state
+    // This is a major improvement over the previous implementation
     let current_status_for_animating = if player.is_attacking {
-        PlayerAnimationState::Attacking
+        // When attacking, use the exact combo stage and direction from the state machine
+        if let PlayerAnimationState::Attacking(combo_stage, direction) = state_machine.current_state {
+            PlayerAnimationState::Attacking(combo_stage, direction)
+        } else {
+            // Fallback - should rarely happen
+            PlayerAnimationState::Attacking(0, AttackDirection::Forward)
+        }
     } else {
+        // For non-attack states, determine based on physics state
         match controller.action_name() {
         // Unless you provide the action names yourself, prefer matching against the `NAME` const
         // of the `TnuaAction` trait. Once `type_name` is stabilized as `const` Tnua will use it to
@@ -762,17 +1036,46 @@ fn handle_animating(
                         .play(&mut animation_player, animation_nodes.jump, transition_time)
                         .set_speed(1.0);
                 }
-                PlayerAnimationState::Attacking => {
+                PlayerAnimationState::Attacking(combo_stage, direction) => {
                     // Fast transition to attack for responsiveness
                     let transition_time = match old_state {
                         Some(PlayerAnimationState::Running) |
                         Some(PlayerAnimationState::Walking) => very_fast_transition,
+                        // Quick transition between combo stages
+                        Some(PlayerAnimationState::Attacking(_, _)) => very_fast_transition,
                         _ => attack_transition,
                     };
                     
+                    // Choose animation based on combo stage
+                    let base_animation_node = match combo_stage {
+                        0 => animation_nodes.attack,    // First attack - normal slash
+                        1 => animation_nodes.attack2,   // Second attack - slightly faster
+                        _ => animation_nodes.attack3,   // Final attack - much faster, more powerful
+                    };
+                    
+                    // Adjust speed and rotation based on direction
+                    // For actual directional attacks, you would use different animation clips
+                    // Here we're simulating it with rotation adjustments
+                    let (speed, _rotation_offset) = match direction {
+                        AttackDirection::Forward => (1.8, 0.0),           // Normal forward attack
+                        AttackDirection::Left => (1.7, -std::f32::consts::FRAC_PI_4), // Slightly slower side attack
+                        AttackDirection::Right => (1.7, std::f32::consts::FRAC_PI_4), // Slightly slower side attack
+                        AttackDirection::Backward => (2.0, std::f32::consts::PI), // Faster backward attack
+                    };
+                    
+                    // Apply speed boost for higher combo stages
+                    let combo_speed_boost = match combo_stage {
+                        0 => 1.0,
+                        1 => 1.1,
+                        _ => 1.3, // Final attack is much faster
+                    };
+                    
                     transitions
-                        .play(&mut animation_player, animation_nodes.attack, transition_time)
-                        .set_speed(2.0);
+                        .play(&mut animation_player, base_animation_node, transition_time)
+                        .set_speed(speed * combo_speed_boost);
+                        
+                    // Note: In a real implementation, you would select different animations
+                    // for different directions rather than just speed adjustments
                 }
                 PlayerAnimationState::Rolling => {
                     // Fast transition to roll for responsiveness
