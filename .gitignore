@@ -4,3 +4,4 @@ backup
 Cargo.lock
 .DS_Store
 game
+.vscode

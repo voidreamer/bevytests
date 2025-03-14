@@ -32,10 +32,10 @@ impl Default for Player {
             // Stats for UI
             health: 100.0,
             max_health: 100.0,
-            stamina: 1000.0,
-            max_stamina: 1000.0,
-            stamina_regen_rate: 15.0, // Stamina gained per second when not using
-            stamina_use_rate: 25.0,   // Stamina used per second when running
+            stamina: 100.0,
+            max_stamina: 100.0,
+            stamina_regen_rate: 30.0, // Stamina gained per second when not using
+            stamina_use_rate: 15.0,   // Stamina used per second when running
             exhausted: false,
             exhaustion_timer: 0.0,
         }

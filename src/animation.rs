@@ -15,7 +15,7 @@ pub enum PlayerAnimationState {
     Tpose,
     Idling,
     Jumping,
-    Running(f32),
+    Running,
     Attacking,
     Rolling,
     Walking,
@@ -408,29 +408,9 @@ pub fn keyboard_movement_control(
                 }
             }
         }
-        
-        // Regenerate stamina when not running
-        if !keyboard_input.pressed(KeyCode::ShiftLeft) || !player.is_moving {
-            player.stamina = (player.stamina + 15.0 * time.delta_secs()).min(100.0);
-            
-            // Clear exhaustion if stamina recovered enough
-            if player.stamina > 30.0 {
-                player.exhausted = false;
-            }
-        }
     }
 }
-// Plugin for player animation 
-pub struct PlayerAnimationPlugin;
 
-impl Plugin for PlayerAnimationPlugin {
-    fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, setup_animations)
-            .add_systems(Update, setup_scene_once_loaded)
-            .add_systems(Update, keyboard_movement_control);
-    }
-}
 */
 fn apply_controls(
     keyboard: Res<ButtonInput<KeyCode>>, 
@@ -490,40 +470,54 @@ fn apply_controls(
     
     // Calculate speed based on stamina
     let dt = time.delta_secs();
-    let speed_modifier = if player.stamina < 20.0 {
-        // Progressively slower as stamina depletes
-        0.6 + (player.stamina / 20.0) * 0.4
-    } else if player.exhausted {
-        0.3 // Very slow when exhausted
+    // First, check if we need to update exhaustion state
+    if player.stamina <= 10.0 && !player.exhausted {
+        player.exhausted = true;
+        player.exhaustion_timer = 3.0; // 3 seconds of exhaustion
+    }
+    
+    let speed_modifier = if player.exhausted {
+        0.5 // Very slow when exhausted
+    } else if keyboard.pressed(KeyCode::ShiftLeft) && player.stamina > 10.0 {
+        // Running speed when shift is pressed and enough stamina
+        2.0
     } else {
         1.0
     };
     
-    let base_speed = 10.0;
+    let base_speed = 4.0;
     let current_speed = base_speed * speed_modifier;
     
     // Handle stamina regeneration/depletion
     if player.is_moving {
-        // Use stamina while moving
-        player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
-        
-        // Check if we've reached exhaustion
-        if player.stamina <= 0.1 && !player.exhausted {
-            player.exhausted = true;
-            player.exhaustion_timer = 2.0; // 2 seconds of exhaustion
+        // Only use stamina when running (shift pressed)
+        if keyboard.pressed(KeyCode::ShiftLeft) && !player.exhausted {
+            // Deplete stamina only when running
+            player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
+            
+            // Check if we've reached exhaustion
+            if player.stamina <= 10.0 && !player.exhausted {
+                player.exhausted = true;
+                player.exhaustion_timer = 2.0; // 2 seconds of exhaustion
+            }
+        } else if !player.exhausted {
+            // When walking (not running), slowly regenerate stamina
+            player.stamina = (player.stamina + player.stamina_regen_rate * 0.2 * dt).min(player.max_stamina);
         }
     } else if !player.exhausted {
-        // Regenerate stamina when not moving and not exhausted
+        // Regenerate stamina faster when not moving and not exhausted
         player.stamina = (player.stamina + player.stamina_regen_rate * dt).min(player.max_stamina);
-    } else if !player.is_moving {
+    } else {
         // Handle exhaustion recovery timer
         player.exhaustion_timer -= dt;
         if player.exhaustion_timer <= 0.0 {
             player.exhausted = false;
         }
         
-        // Slower regeneration when exhausted but not moving
-        player.stamina = (player.stamina + player.stamina_regen_rate * 0.3 * dt).min(player.max_stamina);
+        // Slower regeneration when exhausted
+        if player.stamina < 30.0 {
+            player.stamina = (player.stamina + player.stamina_regen_rate * 0.3 * dt).min(player.max_stamina);
+        }
     }
     
     controller.basis(TnuaBuiltinWalk{
@@ -541,21 +535,21 @@ fn apply_controls(
 
     // Feed the jump action every frame as long as the player holds the jump button. If the player
     // stops holding the jump button, simply stop feeding the action.
-    if keyboard.pressed(KeyCode::ControlLeft) && player.stamina >= 20.0 && !player.exhausted {
+    if keyboard.pressed(KeyCode::ControlLeft) && player.stamina >= 10.0 && !player.exhausted {
         // Use stamina for jumping
-        player.stamina = (player.stamina - 20.0).max(0.0);
+        player.stamina = (player.stamina - 1.0).max(0.0);
         
         controller.action(TnuaBuiltinJump{
             // The height is the only mandatory field of the jump button.
-            height: 2.0,
+            height: 3.0,
             // `TnuaBuiltinJump` also has customization fields with sensible defaults.
             ..Default::default()
         });
     }
 
-    if keyboard.pressed(KeyCode::Space) && player.stamina >= 25.0 && !player.exhausted {
+    if keyboard.pressed(KeyCode::Space) && player.stamina >= 10.0 && !player.exhausted {
         // Use stamina for rolling
-        player.stamina = (player.stamina - 25.0).max(0.0);
+        player.stamina = (player.stamina - 1.0).max(0.0);
         
         // Get the movement direction based on what direction player is going
         let dash_direction = if direction != Vec3::ZERO {
@@ -574,11 +568,12 @@ fn apply_controls(
     }
 }
 
-// This is the important system for this example
 fn handle_animating(
     mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>)>,
+    player_exhaustion_query: Query<&Player>,
     mut animation_player_query: Query<&mut AnimationPlayer>,
     animation_nodes: Option<Res<PlayerAnimationNodes>>,
+    keyboard: Res<ButtonInput<KeyCode>>, 
 ) {
     // An actual game should match the animation player and the controller. Here we cheat for
     // simplicity and use the only controller and only player.
@@ -640,7 +635,23 @@ fn handle_animating(
             } else {
                 let speed = basis_state.running_velocity.length();
                 if 0.01 < speed {
-                    PlayerAnimationState::Running(0.1 * speed)
+                    // Check if player is exhausted - use walk animation regardless of shift key
+                    if let Ok(player) = player_exhaustion_query.get_single() {
+                        if player.exhausted {
+                            PlayerAnimationState::Walking
+                        } else if keyboard.pressed(KeyCode::ShiftLeft) {
+                            PlayerAnimationState::Running
+                        } else {
+                            PlayerAnimationState::Walking
+                        }
+                    } else {
+                        // Fallback if player query fails
+                        if keyboard.pressed(KeyCode::ShiftLeft) {
+                            PlayerAnimationState::Running
+                        } else {
+                            PlayerAnimationState::Walking
+                        }
+                    }
                 } else {
                     PlayerAnimationState::Idling
                 }
@@ -658,9 +669,18 @@ fn handle_animating(
             // Specifically for the running animation, even when the state remains the speed can
             // still change. When it does, we simply need to update the speed in the animation
             // player.
-            if let PlayerAnimationState::Running(speed) = state {
-                if let Some(animation) = animation_player.animation_mut(animation_nodes.run) {
-                    animation.set_speed(*speed);
+            if let PlayerAnimationState::Running = state {
+                if let Some(_) = animation_player.animation_mut(animation_nodes.run) {
+                    // Check if player is exhausted using our dedicated query
+                    if let Ok(player) = player_exhaustion_query.get_single() {
+                        debug!(player.exhausted);
+                        if player.exhausted {
+                            animation_player
+                                .start(animation_nodes.walk)
+                                .set_speed(0.6)  // Slower speed when exhausted
+                                .repeat();
+                        }
+                    }
                 }
             }
         }
@@ -688,23 +708,19 @@ fn handle_animating(
                 PlayerAnimationState::Walking=> {
                     animation_player
                         .start(animation_nodes.walk)
-                        .set_speed(0.2)
+                        .set_speed(1.0)
                         .repeat();
                 }
                 PlayerAnimationState::Falling=> {
                     animation_player
                         .start(animation_nodes.fall)
-                        .set_speed(0.3)
+                        .set_speed(1.0)
                         .repeat();
                 }
-                PlayerAnimationState::Running(speed) => {
+                PlayerAnimationState::Running => {
                     animation_player
                         .start(animation_nodes.run)
-                        // The running animation, in particular, has a speed that depends on how
-                        // fast the character is running. Note that if the speed changes while the
-                        // character is still running we won't get `Alter` again - so it's
-                        // important to also update the speed in `Maintain { State: Running }`.
-                        .set_speed(*speed)
+                        .set_speed(1.0)
                         .repeat();
                 }
                 PlayerAnimationState::Jumping => {
