@@ -7,6 +7,7 @@ use bevy::{
 use bevy_tnua::{
     builtins::{TnuaBuiltinDash, TnuaBuiltinJumpState},
     prelude::*, TnuaAnimatingState, TnuaAnimatingStateDirective, TnuaUserControlsSystemSet};
+use std::time::Duration;
 
 use crate::player::{Player, PlayerGltfHandle};
 
@@ -41,7 +42,17 @@ pub fn setup_animations(
     mut commands: Commands,
     animation_player_query: Query<Entity, With<AnimationPlayer>>,
     mut animation_graphs_assets: ResMut<Assets<AnimationGraph>>,
+    mut players: Query<(Entity, &AnimationPlayer), Added<AnimationPlayer>>,
 ) {
+    // Initialize players with animations if they're new
+    for (entity, _player) in &mut players {
+        let transitions = AnimationTransitions::new();
+        
+        // We'll set up initial animations later when the PlayerAnimationNodes are ready
+        // This is just to initialize the transitions component
+        commands.entity(entity).insert(transitions);
+    };
+
     let Some(handle) = handle else { return };
     let Some(gltf) = gltf_assets.get(&handle.0) else {
         return;
@@ -70,7 +81,6 @@ pub fn setup_animations(
 
     // So that we won't run this again
     commands.remove_resource::<PlayerGltfHandle>();
- 
 }
 /*
 pub fn setup_scene_once_loaded(
@@ -156,69 +166,6 @@ pub fn keyboard_movement_control(
             // Reset roll state when timer finishes
             if timer.finished() && *is_rolling {
                 *is_rolling = false;
-            }
-        }
-        
-        // Calculate camera directions for movement
-        let forward = camera_transform.forward();
-        let camera_forward = Vec3::new(forward.x, 0.0, forward.z).normalize();
-        let camera_right = camera_forward.cross(Vec3::Y).normalize();
-        
-        // Initialize movement direction
-        let mut direction = Vec3::ZERO;
-        let mut any_movement = false;
-        
-        // Check each movement key and add its contribution
-        if keyboard_input.pressed(KeyCode::KeyW) {
-            direction += camera_forward;
-            any_movement = true;
-        }
-        if keyboard_input.pressed(KeyCode::KeyS) {
-            direction -= camera_forward;
-            any_movement = true;
-        }
-        if keyboard_input.pressed(KeyCode::KeyA) {
-            direction -= camera_right;
-            any_movement = true;
-        }
-        if keyboard_input.pressed(KeyCode::KeyD) {
-            direction += camera_right;
-            any_movement = true;
-        }
-        
-        // Update player's moving state
-        player.is_moving = any_movement;
-        *is_moving = any_movement;
-        
-        // Apply movement if we have input and not in certain animations
-        if any_movement && !*is_rolling {
-            direction = direction.normalize();
-            
-            // Calculate movement speed based on player state
-            let base_speed = 5.0; // Base movement speed
-            let speed_multiplier = if player.exhausted {
-                0.5 // Slower when exhausted
-            } else if keyboard_input.pressed(KeyCode::ShiftLeft) && player.stamina > 10.0 {
-                2.0 // Running speed
-            } else {
-                1.0 // Walking speed
-            };
-            
-            // Apply movement
-            let movement = direction * base_speed * speed_multiplier * time.delta_secs();
-            transform.translation += movement;
-            
-            // Rotate player to face movement direction with smoothing
-            if direction.length_squared() > 0.01 {
-                let target_rotation = Quat::from_rotation_y(
-                    f32::atan2(direction.x, direction.z)
-                );
-                
-                // Smoothly rotate towards movement direction
-                transform.rotation = transform.rotation.slerp(
-                    target_rotation, 
-                    10.0 * time.delta_secs()
-                );
             }
         }
         
@@ -571,7 +518,7 @@ fn apply_controls(
 fn handle_animating(
     mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>)>,
     player_exhaustion_query: Query<&Player>,
-    mut animation_player_query: Query<&mut AnimationPlayer>,
+    mut animation_query: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animation_nodes: Option<Res<PlayerAnimationNodes>>,
     keyboard: Res<ButtonInput<KeyCode>>, 
 ) {
@@ -580,12 +527,27 @@ fn handle_animating(
     let Ok((controller, mut animating_state)) = player_query.get_single_mut() else {
         return;
     };
-    let Ok(mut animation_player) = animation_player_query.get_single_mut() else {
+    let Ok((mut animation_player, mut transitions)) = animation_query.get_single_mut() else {
         return;
     };
     let Some(animation_nodes) = animation_nodes else {
         return;
     };
+    
+    // Define transition durations for different animation states
+    // Create a transition map for smoother animations
+    let common_transition = Duration::from_secs_f32(0.2);
+    let fast_transition = Duration::from_secs_f32(0.1);
+    let very_fast_transition = Duration::from_secs_f32(0.05);
+    
+    // Default transition times
+    let idle_transition = Duration::from_secs_f32(0.25);
+    let walk_transition = Duration::from_secs_f32(0.25);
+    let run_transition = Duration::from_secs_f32(0.2);
+    let jump_transition = Duration::from_secs_f32(0.15);
+    let fall_transition = Duration::from_secs_f32(0.15);
+    let attack_transition = Duration::from_secs_f32(0.1);
+    let roll_transition = Duration::from_secs_f32(0.1);
 
     // Here we use the data from TnuaController to determine what the character is currently doing,
     // so that we can later use that information to decide which animation to play.
@@ -673,10 +635,10 @@ fn handle_animating(
                 if let Some(_) = animation_player.animation_mut(animation_nodes.run) {
                     // Check if player is exhausted using our dedicated query
                     if let Ok(player) = player_exhaustion_query.get_single() {
-                        debug!(player.exhausted);
                         if player.exhausted {
-                            animation_player
-                                .start(animation_nodes.walk)
+                            // Use transition when going from running to walking due to exhaustion
+                            transitions
+                                .play(&mut animation_player, animation_nodes.walk, walk_transition)
                                 .set_speed(0.6)  // Slower speed when exhausted
                                 .repeat();
                         }
@@ -685,66 +647,141 @@ fn handle_animating(
             }
         }
         TnuaAnimatingStateDirective::Alter {
-            old_state: _,
+            old_state,
             state,
         } => {
             // `Alter` means that we have switched to a different variant and need to play a
-            // different animation.
+            // different animation with proper transitions.
 
-            // First - stop the currently running animation. We don't check which one is running
-            // here because we just assume it belongs to the old state, but more sophisticated code
-            // can try to phase from the old animation to the new one.
-            animation_player.stop_all();
-
-            // Depending on the new state, we choose the animation to run and its parameters (here
-            // they are the speed and whether or not to repeat)
+            // Instead of stopping all animations, we'll use transitions between states
             match state {
-                PlayerAnimationState::Idling=> {
-                    animation_player
-                        .start(animation_nodes.idle)
+                PlayerAnimationState::Idling => {
+                    // Different transition times for idle depending on previous state
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Walking) => fast_transition,
+                        Some(PlayerAnimationState::Running) => common_transition,
+                        Some(PlayerAnimationState::Jumping) |
+                        Some(PlayerAnimationState::Falling) => common_transition,
+                        Some(PlayerAnimationState::Rolling) => common_transition,
+                        _ => idle_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.idle, transition_time)
                         .set_speed(1.0)
                         .repeat();
                 }
-                PlayerAnimationState::Walking=> {
-                    animation_player
-                        .start(animation_nodes.walk)
+                PlayerAnimationState::Walking => {
+                    // Use dynamic transition based on previous state
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Idling) => very_fast_transition,
+                        Some(PlayerAnimationState::Running) => fast_transition,
+                        Some(PlayerAnimationState::Falling) => common_transition,
+                        Some(PlayerAnimationState::Jumping) => common_transition,
+                        Some(PlayerAnimationState::Rolling) => fast_transition,
+                        _ => walk_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.walk, transition_time)
                         .set_speed(1.0)
                         .repeat();
                 }
-                PlayerAnimationState::Falling=> {
-                    animation_player
-                        .start(animation_nodes.fall)
+                PlayerAnimationState::Falling => {
+                    // Different transition times depending on previous state
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Jumping) => very_fast_transition,
+                        _ => fall_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.fall, transition_time)
                         .set_speed(1.0)
                         .repeat();
                 }
                 PlayerAnimationState::Running => {
-                    animation_player
-                        .start(animation_nodes.run)
+                    // Faster transition from walking to running
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Walking) => very_fast_transition,
+                        Some(PlayerAnimationState::Jumping) => fast_transition,
+                        Some(PlayerAnimationState::Rolling) => fast_transition,
+                        _ => run_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.run, transition_time)
                         .set_speed(1.0)
                         .repeat();
                 }
                 PlayerAnimationState::Jumping => {
-                    animation_player
-                        .start(animation_nodes.jump)
+                    // Use fastest transition when jumping from running for a more responsive feel
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Running) => very_fast_transition,
+                        Some(PlayerAnimationState::Walking) => fast_transition,
+                        _ => jump_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.jump, transition_time)
                         .set_speed(1.0);
                 }
-                PlayerAnimationState::Attacking=> {
-                    animation_player
-                        .start(animation_nodes.attack)
+                PlayerAnimationState::Attacking => {
+                    // Fast transition to attack for responsiveness
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Running) |
+                        Some(PlayerAnimationState::Walking) => very_fast_transition,
+                        _ => attack_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.attack, transition_time)
                         .set_speed(2.0);
                 }
-                PlayerAnimationState::Rolling=> {
-                    animation_player
-                        .start(animation_nodes.roll)
+                PlayerAnimationState::Rolling => {
+                    // Fast transition to roll for responsiveness
+                    let transition_time = match old_state {
+                        Some(PlayerAnimationState::Running) |
+                        Some(PlayerAnimationState::Walking) => very_fast_transition,
+                        _ => roll_transition,
+                    };
+                    
+                    transitions
+                        .play(&mut animation_player, animation_nodes.roll, transition_time)
                         .set_speed(1.5);
                 }
-                PlayerAnimationState::Tpose=> {
-                    animation_player
-                        .start(animation_nodes.tpose)
+                PlayerAnimationState::Tpose => {
+                    transitions
+                        .play(&mut animation_player, animation_nodes.tpose, Duration::ZERO)
                         .set_speed(0.0);
                 }
             }
         }
+    }
+}
+
+// Initialize player animations once the animation nodes are loaded
+fn initialize_player_animations(
+    animations: Option<Res<PlayerAnimationNodes>>,
+    mut animation_query: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
+    mut already_initialized: Local<bool>,
+) {
+    // Only run this once
+    if *already_initialized {
+        return;
+    }
+    
+    let Some(animations) = animations else {
+        return;
+    };
+    
+    for (mut player, mut transitions) in &mut animation_query {
+        // Start with idle animation, using a seamless transition
+        transitions
+            .play(&mut player, animations.idle, Duration::from_secs_f32(0.25))
+            .repeat();
+        
+        // Mark as initialized to avoid running this again
+        *already_initialized = true;
     }
 }
 
@@ -757,6 +794,7 @@ impl Plugin for PlayerAnimationPlugin {
             .add_systems(FixedUpdate, (
                 apply_controls.in_set(TnuaUserControlsSystemSet),
                 setup_animations,
+                initialize_player_animations,
                 handle_animating,
             ),
         );
