@@ -52,7 +52,7 @@ fn main() {
             lighting::LightingPlugin,
             animation::PlayerAnimationPlugin,
             // fx::FXPlugin, // Disable til this works.
-            ui::UIPlugin, 
+            ui::UIPlugin, // This draws the health, stamina and other bars
             shader::ShaderPlugin, 
         ))
         .run();

@@ -1,7 +1,6 @@
 use bevy::{
     prelude::*,
-    pbr::CascadeShadowConfigBuilder,
-    pbr::VolumetricLight,
+    pbr::CascadeShadowConfigBuilder
 };
 
 

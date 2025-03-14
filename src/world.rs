@@ -1,14 +1,8 @@
 use avian3d::prelude::{Collider, RigidBody};
 use bevy::prelude::*;
+use bevy_lunex::Dimension;
 
-use std::{
-    f32::consts::{FRAC_PI_4, PI},
-    time::Duration,
-};
-use crate::player::Player;
 use crate::physics::on_level_spawn;
-
-const CHARACTER_PATH: &str = "models/character.glb";
 
 
 // Scene creation system with physics
@@ -18,19 +12,6 @@ pub fn spawn_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    println!("Spawning third-person game world with physics...");
-    
-    // ==============================================
-    // Create player character 
-    // ==============================================
-    commands.spawn((
-        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
-        RigidBody::Kinematic,
-        Player::default(),
-    )).with_children(|children|{
-        children.spawn((Collider::capsule(0.4, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
-    });
-
     // ==============================================
     // Create the ground
     // ==============================================
@@ -92,32 +73,6 @@ pub fn spawn_scene(
 }
 
 
-// ==============================================
-// Some simple UI text 
-// ==============================================
-
-fn spawn_text(commands: &mut Commands){
-    commands.spawn((
-        create_help_text(),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(12.0),
-            left: Val::Px(12.0),
-            ..default()
-        }
-    ));
-}
-fn create_help_text() -> Text {
-    format!(
-        "ESC: Exit game\n",
-    )
-    .into()
-}
-
-fn setup(mut commands: Commands){
-    spawn_text(&mut commands);
-}
-
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
@@ -125,6 +80,6 @@ impl Plugin for WorldPlugin {
             app
             // Set a dark sky color
             .insert_resource(ClearColor(Color::srgb(0.05, 0.08, 0.15)))
-            .add_systems(Startup, (setup, spawn_scene));
+            .add_systems(Startup, spawn_scene);
     }
 }

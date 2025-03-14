@@ -1,8 +1,13 @@
+use avian3d::prelude::{Collider, LockedAxes, RigidBody};
 use bevy::{
-    prelude::*,
-    input::keyboard::KeyCode,
+    input::keyboard::KeyCode, prelude::*
 };
+use bevy_tnua::{prelude::TnuaController, TnuaAnimatingState};
+use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::camera::ThirdPersonCamera;
+use crate::animation::PlayerAnimationState;
+
+const CHARACTER_PATH: &str = "models/character.glb";
 
 #[derive(Component)]
 pub struct Player {
@@ -240,12 +245,38 @@ fn update_player_stats(
     }
 }
 
+#[derive(Resource)]
+pub struct PlayerGltfHandle(pub Handle<Gltf>);
+
+fn setup_player(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>
+){
+    // ==============================================
+    // Create player character 
+    // ==============================================
+    commands.insert_resource(PlayerGltfHandle(asset_server.load(CHARACTER_PATH)));
+    commands.spawn((
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(CHARACTER_PATH))),
+        RigidBody::Dynamic,
+        TnuaAnimatingState::<PlayerAnimationState>::default(),
+        TnuaController::default(),
+        TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
+        LockedAxes::ROTATION_LOCKED.unlock_rotation_y(),
+        Player::default(),
+    )).with_children(|children|{
+        children.spawn((Collider::capsule(0.5, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
+    });
+}
+
 // Plugin for player functionality
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (player_controller, update_player_stats));
+        app
+        .add_systems(Startup, setup_player)
+        .add_systems(Update, (player_controller, update_player_stats));
         // Animation control is now handled in animation.rs
     }
 }

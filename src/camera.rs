@@ -1,4 +1,3 @@
-use avian3d::prelude::{Collider, RigidBody};
 use bevy::{
     core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping}, input::{
         keyboard::KeyCode, mouse::{MouseMotion, MouseWheel}
@@ -49,8 +48,8 @@ fn spawn_camera(
             hdr: true,
             ..default()
         },
+        Transform::from_xyz(0.0, 16.0, 40.0).looking_at(Vec3::new(0.0, 10.0, 0.0), Vec3::Y),
         // This is for Lunex aparently, but doesnt work.
-        Transform::from_xyz(0.0, 0.0, 1000.0),
         UiSourceCamera::<0>,
         RenderLayers::from_layers(&[0, 2]),
 

@@ -6,9 +6,24 @@ use bevy::{
         keyboard::KeyCode,
     },
 };
-use crate::player::Player;
+use bevy_tnua::{
+    builtins::{TnuaBuiltinDash, TnuaBuiltinJumpState},
+    prelude::*, TnuaAnimatingState, TnuaAnimatingStateDirective, TnuaUserControlsSystemSet};
+
+use crate::player::{Player, PlayerGltfHandle};
 
 const CHARACTER_PATH: &str = "models/character.glb";
+
+pub enum PlayerAnimationState {
+    Tpose,
+    Idling,
+    Jumping,
+    Running(f32),
+    Attacking,
+    Rolling,
+    Walking,
+    Falling
+}
 
 #[derive(Resource)]
 pub struct PlayerAnimationNodes {
@@ -19,46 +34,48 @@ pub struct PlayerAnimationNodes {
     pub attack: AnimationNodeIndex,
     pub roll: AnimationNodeIndex,  
     pub walk: AnimationNodeIndex,  
-    pub graph: Handle<AnimationGraph>,
+    pub fall: AnimationNodeIndex,  
 }
 
 // Setup animations with the new structure
 pub fn setup_animations(
+    handle: Option<Res<PlayerGltfHandle>>,
+    gltf_assets: Res<Assets<Gltf>>,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut graphs: ResMut<Assets<AnimationGraph>>,
+    animation_player_query: Query<Entity, With<AnimationPlayer>>,
+    mut animation_graphs_assets: ResMut<Assets<AnimationGraph>>,
 ) {
-    println!("Setting up character animations...");
+    let Some(handle) = handle else { return };
+    let Some(gltf) = gltf_assets.get(&handle.0) else {
+        return;
+    };
+    let Ok(animation_player_entity) = animation_player_query.get_single() else {
+        return;
+    };
 
-    // Load all animations like before
-    let anim_handles = [
-        asset_server.load(GltfAssetLabel::Animation(0).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(1).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(2).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(3).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(4).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(5).from_asset(CHARACTER_PATH)),
-        asset_server.load(GltfAssetLabel::Animation(6).from_asset(CHARACTER_PATH)),
-    ];
+    let mut graph = AnimationGraph::new();
+    let root_node = graph.root;
 
-    // Create animation graph with all clips
-    let (graph, node_indices) = AnimationGraph::from_clips(anim_handles);
-    let graph_handle = graphs.add(graph);
-    
-    // Store with better naming
-    commands.insert_resource(PlayerAnimationNodes {
-        tpose: node_indices[0],
-        idle: node_indices[1],
-        jump: node_indices[2],
-        roll: node_indices[3],
-        run: node_indices[4],
-        attack: node_indices[5],
-        walk: node_indices[6],
-        graph: graph_handle,
+    commands.insert_resource(PlayerAnimationNodes{
+        tpose: graph.add_clip(gltf.named_animations["tpose"].clone(), 1.0, root_node),
+        idle: graph.add_clip(gltf.named_animations["idle"].clone(), 1.0, root_node),
+        roll: graph.add_clip(gltf.named_animations["roll"].clone(), 1.0, root_node),
+        walk: graph.add_clip(gltf.named_animations["walk"].clone(), 1.0, root_node),
+        run: graph.add_clip(gltf.named_animations["run"].clone(), 1.0, root_node),
+        jump: graph.add_clip(gltf.named_animations["jump"].clone(), 1.0, root_node),
+        attack: graph.add_clip(gltf.named_animations["slash"].clone(), 1.0, root_node),
+        fall: graph.add_clip(gltf.named_animations["fall"].clone(), 1.0, root_node),
     });
-}
 
-// Update scene once loaded - same as before but with new structure
+    commands
+        .entity(animation_player_entity)
+        .insert(AnimationGraphHandle(animation_graphs_assets.add(graph)));
+
+    // So that we won't run this again
+    commands.remove_resource::<PlayerGltfHandle>();
+ 
+}
+/*
 pub fn setup_scene_once_loaded(
     mut commands: Commands,
     animations: Res<PlayerAnimationNodes>,
@@ -406,7 +423,6 @@ pub fn keyboard_movement_control(
         }
     }
 }
-
 // Plugin for player animation 
 pub struct PlayerAnimationPlugin;
 
@@ -416,5 +432,230 @@ impl Plugin for PlayerAnimationPlugin {
             .add_systems(Startup, setup_animations)
             .add_systems(Update, setup_scene_once_loaded)
             .add_systems(Update, keyboard_movement_control);
+    }
+}
+*/
+fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut TnuaController>) {
+    let Ok(mut controller) = query.get_single_mut() else {
+        return;
+    };
+
+    let mut direction = Vec3::ZERO;
+
+    if keyboard.pressed(KeyCode::KeyW) {
+        direction -= Vec3::Z;
+    }
+    if keyboard.pressed(KeyCode::KeyS) {
+        direction += Vec3::Z;
+    }
+    if keyboard.pressed(KeyCode::KeyA) {
+        direction -= Vec3::X;
+    }
+    if keyboard.pressed(KeyCode::KeyD) {
+        direction += Vec3::X;
+    }
+
+    // Feed the basis every frame. Even if the player doesn't move - just use `desired_velocity:
+    // Vec3::ZERO`. `TnuaController` starts without a basis, which will make the character collider
+    // just fall.
+    controller.basis(TnuaBuiltinWalk{
+        // The `desired_velocity` determines how the character will move.
+        desired_velocity: direction.normalize_or_zero() * 10.0,
+        desired_forward: Dir3::new(direction).ok(),
+        // The `float_height` must be greater (even if by little) from the distance between the
+        // character's center and the lowest point of its collider.
+        float_height: 2.0,
+        // `TnuaBuiltinWalk` has many other fields for customizing the movement - but they have
+        // sensible defaults. Refer to the `TnuaBuiltinWalk`'s documentation to learn what they do.
+        ..Default::default()
+    });
+
+    // Feed the jump action every frame as long as the player holds the jump button. If the player
+    // stops holding the jump button, simply stop feeding the action.
+    if keyboard.pressed(KeyCode::ControlLeft) {
+        controller.action(TnuaBuiltinJump{
+            // The height is the only mandatory field of the jump button.
+            height: 4.0,
+            // `TnuaBuiltinJump` also has customization fields with sensible defaults.
+            ..Default::default()
+        });
+    }
+
+    if keyboard.pressed(KeyCode::Space) {
+        controller.action(TnuaBuiltinDash{
+            ..Default::default()
+        });
+    }
+}
+
+// This is the important system for this example
+fn handle_animating(
+    mut player_query: Query<(&TnuaController, &mut TnuaAnimatingState<PlayerAnimationState>)>,
+    mut animation_player_query: Query<&mut AnimationPlayer>,
+    animation_nodes: Option<Res<PlayerAnimationNodes>>,
+) {
+    // An actual game should match the animation player and the controller. Here we cheat for
+    // simplicity and use the only controller and only player.
+    let Ok((controller, mut animating_state)) = player_query.get_single_mut() else {
+        return;
+    };
+    let Ok(mut animation_player) = animation_player_query.get_single_mut() else {
+        return;
+    };
+    let Some(animation_nodes) = animation_nodes else {
+        return;
+    };
+
+    // Here we use the data from TnuaController to determine what the character is currently doing,
+    // so that we can later use that information to decide which animation to play.
+
+    // First we look at the `action_name` to determine which action (if at all) the character is
+    // currently performing:
+    let current_status_for_animating = match controller.action_name() {
+        // Unless you provide the action names yourself, prefer matching against the `NAME` const
+        // of the `TnuaAction` trait. Once `type_name` is stabilized as `const` Tnua will use it to
+        // generate these names automatically, which may result in a change to the name.
+        Some(TnuaBuiltinJump::NAME) => {
+            // In case of jump, we want to cast it so that we can get the concrete jump state.
+            let (_, jump_state) = controller
+                .concrete_action::<TnuaBuiltinJump>()
+                .expect("action name mismatch");
+            // Depending on the state of the jump, we need to decide if we want to play the jump
+            // animation or the fall animation.
+            match jump_state {
+                TnuaBuiltinJumpState::NoJump => return,
+                TnuaBuiltinJumpState::StartingJump { .. } => PlayerAnimationState::Jumping,
+                TnuaBuiltinJumpState::SlowDownTooFastSlopeJump { .. } => PlayerAnimationState::Jumping,
+                TnuaBuiltinJumpState::MaintainingJump => PlayerAnimationState::Jumping,
+                TnuaBuiltinJumpState::StoppedMaintainingJump => PlayerAnimationState::Jumping,
+                TnuaBuiltinJumpState::FallSection => PlayerAnimationState::Falling,
+            }
+        }
+        // Tnua should only have the `action_name` of the actions you feed to it. If it has
+        // anything else - consider it a bug.
+        Some(other) => panic!("Unknown action {other}"),
+        // No action name means that no action is currently being performed - which means the
+        // animation should be decided by the basis.
+        None => {
+            // If there is no action going on, we'll base the animation on the state of the
+            // basis.
+            let Some((_, basis_state)) = controller.concrete_basis::<TnuaBuiltinWalk>() else {
+                // Since we only use the walk basis in this example, if we can't get get this
+                // basis' state it probably means the system ran before any basis was set, so we
+                // just stkip this frame.
+                return;
+            };
+            if basis_state.standing_on_entity().is_none() {
+                // The walk basis keeps track of what the character is standing on. If it doesn't
+                // stand on anything, `standing_on_entity` will be empty - which means the
+                // character has walked off a cliff and needs to fall.
+                PlayerAnimationState::Falling
+            } else {
+                let speed = basis_state.running_velocity.length();
+                if 0.01 < speed {
+                    PlayerAnimationState::Running(0.1 * speed)
+                } else {
+                    PlayerAnimationState::Idling
+                }
+            }
+        }
+    };
+
+    let animating_directive = animating_state.update_by_discriminant(current_status_for_animating);
+
+    match animating_directive {
+        TnuaAnimatingStateDirective::Maintain { state } => {
+            // `Maintain` means that we did not switch to a different variant, so there is no need
+            // to change animations.
+
+            // Specifically for the running animation, even when the state remains the speed can
+            // still change. When it does, we simply need to update the speed in the animation
+            // player.
+            if let PlayerAnimationState::Running(speed) = state {
+                if let Some(animation) = animation_player.animation_mut(animation_nodes.run) {
+                    animation.set_speed(*speed);
+                }
+            }
+        }
+        TnuaAnimatingStateDirective::Alter {
+            old_state: _,
+            state,
+        } => {
+            // `Alter` means that we have switched to a different variant and need to play a
+            // different animation.
+
+            // First - stop the currently running animation. We don't check which one is running
+            // here because we just assume it belongs to the old state, but more sophisticated code
+            // can try to phase from the old animation to the new one.
+            animation_player.stop_all();
+
+            // Depending on the new state, we choose the animation to run and its parameters (here
+            // they are the speed and whether or not to repeat)
+            match state {
+                PlayerAnimationState::Idling=> {
+                    animation_player
+                        .start(animation_nodes.idle)
+                        .set_speed(1.0)
+                        .repeat();
+                }
+                PlayerAnimationState::Walking=> {
+                    animation_player
+                        .start(animation_nodes.walk)
+                        .set_speed(0.2)
+                        .repeat();
+                }
+                PlayerAnimationState::Falling=> {
+                    animation_player
+                        .start(animation_nodes.fall)
+                        .set_speed(0.3)
+                        .repeat();
+                }
+                PlayerAnimationState::Running(speed) => {
+                    animation_player
+                        .start(animation_nodes.run)
+                        // The running animation, in particular, has a speed that depends on how
+                        // fast the character is running. Note that if the speed changes while the
+                        // character is still running we won't get `Alter` again - so it's
+                        // important to also update the speed in `Maintain { State: Running }`.
+                        .set_speed(*speed)
+                        .repeat();
+                }
+                PlayerAnimationState::Jumping => {
+                    animation_player
+                        .start(animation_nodes.jump)
+                        .set_speed(1.0);
+                }
+                PlayerAnimationState::Attacking=> {
+                    animation_player
+                        .start(animation_nodes.attack)
+                        .set_speed(2.0);
+                }
+                PlayerAnimationState::Rolling=> {
+                    animation_player
+                        .start(animation_nodes.roll)
+                        .set_speed(2.0);
+                }
+                PlayerAnimationState::Tpose=> {
+                    animation_player
+                        .start(animation_nodes.tpose)
+                        .set_speed(0.0);
+                }
+            }
+        }
+    }
+}
+
+pub struct PlayerAnimationPlugin;
+
+impl Plugin for PlayerAnimationPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_systems(Startup, setup_animations)
+            .add_systems(FixedUpdate, (
+                apply_controls.in_set(TnuaUserControlsSystemSet),
+                setup_animations,
+                handle_animating,
+            ),
+        );
     }
 }

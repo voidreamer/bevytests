@@ -605,6 +605,33 @@ pub fn debug_ui_control(
     }
 }
 
+
+// ==============================================
+// Some simple UI text 
+// ==============================================
+
+fn spawn_text(commands: &mut Commands){
+    commands.spawn((
+        create_help_text(),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        }
+    ));
+}
+fn create_help_text() -> Text {
+    format!(
+        "ESC: Exit game\n",
+    )
+    .into()
+}
+
+fn setup(mut commands: Commands){
+    spawn_text(&mut commands);
+}
+
 // UI plugin
 pub struct UIPlugin;
 
@@ -612,7 +639,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GameUI>()
            .add_plugins(UiLunexPlugin)
-           .add_systems(Startup, setup_ui)
+           .add_systems(Startup, (setup_ui, setup))
            .add_systems(Update, (
                update_game_state,
                update_health_bar,

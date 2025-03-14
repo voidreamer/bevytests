@@ -8,7 +8,7 @@ use avian3d::prelude::{
 };
 use bevy::{
       prelude::*,
-      app::{App, FixedUpdate, Plugin, Startup},
+      app::{App, Plugin},
       ecs::system::Commands, math::Vec3,
       gltf::GltfMeshExtras, scene::SceneInstanceReady, 
 };
@@ -99,10 +99,10 @@ impl Plugin for AvPhysicsPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_plugins((
-            PhysicsPlugins::default(),
-            PhysicsDebugPlugin::default(),
-            TnuaControllerPlugin::new(FixedUpdate),
-            TnuaAvian3dPlugin::new(FixedUpdate),
+            PhysicsPlugins::new(PostUpdate),
+            PhysicsDebugPlugin::new(PostUpdate),
+            TnuaAvian3dPlugin::new(Update),
+            TnuaControllerPlugin::new(Update),
         ))
         .insert_resource(Gravity(Vec3::NEG_Y * 19.6));
     }
