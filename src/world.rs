@@ -1,6 +1,5 @@
 use avian3d::prelude::{Collider, RigidBody};
 use bevy::prelude::*;
-use bevy_lunex::Dimension;
 
 use crate::physics::on_level_spawn;
 

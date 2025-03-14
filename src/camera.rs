@@ -1,5 +1,5 @@
 use bevy::{
-    core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping}, input::{
+    core_pipeline::{bloom::Bloom, experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing}, motion_blur::MotionBlur, tonemapping::Tonemapping, Skybox}, input::{
         keyboard::KeyCode, mouse::{MouseMotion, MouseWheel}
     }, pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel, VolumetricFog}, prelude::*, render::view::RenderLayers, window::PrimaryWindow
 };
@@ -69,7 +69,7 @@ fn spawn_camera(
         DistanceFog{
             color: Color::srgb_u8(43, 44, 100),
             falloff: FogFalloff::Exponential{
-                density: 15e-3,
+                density: 0.05,
             },
             ..default()
         },
@@ -109,6 +109,11 @@ fn spawn_camera(
     .insert(ScreenSpaceAmbientOcclusion{
         quality_level: ScreenSpaceAmbientOcclusionQualityLevel::High,
         constant_object_thickness: 4.0,
+    })
+    .insert(Skybox{
+            image: asset_server.load("environment_maps/pisa_specular_rgb9e5_zstd.ktx2"),
+            brightness: 1000.0,
+            ..default()
     });
 }
     

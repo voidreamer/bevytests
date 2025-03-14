@@ -14,6 +14,8 @@ mod menu;
 mod fx;
 mod physics;
 mod shader;
+mod progression;
+mod achievements;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -53,7 +55,9 @@ fn main() {
             animation::PlayerAnimationPlugin,
             // fx::FXPlugin, // Disable til this works.
             ui::UIPlugin, // This draws the health, stamina and other bars
-            shader::ShaderPlugin, 
+            shader::ShaderPlugin,
+            progression::ProgressionPlugin,
+            achievements::AchievementsPlugin,
         ))
         .run();
 }
