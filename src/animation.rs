@@ -435,33 +435,63 @@ impl Plugin for PlayerAnimationPlugin {
     }
 }
 */
-fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut TnuaController>) {
+fn apply_controls(
+    keyboard: Res<ButtonInput<KeyCode>>, 
+    mut query: Query<&mut TnuaController>,
+    camera_query: Query<&Transform, With<Camera3d>>
+) {
     let Ok(mut controller) = query.get_single_mut() else {
         return;
     };
 
+    // Get camera for movement direction
+    let camera_transform = if let Ok(camera) = camera_query.get_single() {
+        camera
+    } else {
+        return;
+    };
+
+    // Calculate camera directions for movement
+    let forward = camera_transform.forward();
+    let camera_forward = Vec3::new(forward.x, 0.0, forward.z).normalize();
+    let camera_right = camera_forward.cross(Vec3::Y).normalize();
+    
+    // Initialize movement direction
     let mut direction = Vec3::ZERO;
 
+    // Check each movement key and add its contribution
     if keyboard.pressed(KeyCode::KeyW) {
-        direction -= Vec3::Z;
+        direction += camera_forward;
     }
     if keyboard.pressed(KeyCode::KeyS) {
-        direction += Vec3::Z;
+        direction -= camera_forward;
     }
     if keyboard.pressed(KeyCode::KeyA) {
-        direction -= Vec3::X;
+        direction -= camera_right;
     }
     if keyboard.pressed(KeyCode::KeyD) {
-        direction += Vec3::X;
+        direction += camera_right;
     }
 
     // Feed the basis every frame. Even if the player doesn't move - just use `desired_velocity:
     // Vec3::ZERO`. `TnuaController` starts without a basis, which will make the character collider
     // just fall.
+    
+    // For characters with front in negative-Z direction, we need to invert the direction for desired_forward
+    // This makes the character face the direction it's moving instead of backward
+    let forward_dir = if direction != Vec3::ZERO {
+        // Negate the direction to correct model orientation
+        -direction
+    } else {
+        // If not moving, use camera forward as default orientation
+        -camera_forward
+    };
+    
     controller.basis(TnuaBuiltinWalk{
         // The `desired_velocity` determines how the character will move.
         desired_velocity: direction.normalize_or_zero() * 10.0,
-        desired_forward: Dir3::new(direction).ok(),
+        // Make the character face in the opposite direction of movement
+        desired_forward: Dir3::new(forward_dir).ok(),
         // The `float_height` must be greater (even if by little) from the distance between the
         // character's center and the lowest point of its collider.
         float_height: 2.0,
