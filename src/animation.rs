@@ -1,8 +1,6 @@
-use std::time::Duration;
 use bevy::{
     prelude::*,
     input::{
-        mouse::MouseButton,
         keyboard::KeyCode,
     },
 };
@@ -12,7 +10,6 @@ use bevy_tnua::{
 
 use crate::player::{Player, PlayerGltfHandle};
 
-const CHARACTER_PATH: &str = "models/character.glb";
 
 pub enum PlayerAnimationState {
     Tpose,
@@ -437,10 +434,11 @@ impl Plugin for PlayerAnimationPlugin {
 */
 fn apply_controls(
     keyboard: Res<ButtonInput<KeyCode>>, 
-    mut query: Query<&mut TnuaController>,
-    camera_query: Query<&Transform, With<Camera3d>>
+    mut query: Query<(&mut TnuaController, &mut Player)>,
+    camera_query: Query<&Transform, With<Camera3d>>,
+    time: Res<Time>,
 ) {
-    let Ok(mut controller) = query.get_single_mut() else {
+    let Ok((mut controller, mut player)) = query.get_single_mut() else {
         return;
     };
 
@@ -473,6 +471,9 @@ fn apply_controls(
         direction += camera_right;
     }
 
+    // Update player's moving state
+    player.is_moving = direction != Vec3::ZERO;
+
     // Feed the basis every frame. Even if the player doesn't move - just use `desired_velocity:
     // Vec3::ZERO`. `TnuaController` starts without a basis, which will make the character collider
     // just fall.
@@ -487,9 +488,47 @@ fn apply_controls(
         -camera_forward
     };
     
+    // Calculate speed based on stamina
+    let dt = time.delta_secs();
+    let speed_modifier = if player.stamina < 20.0 {
+        // Progressively slower as stamina depletes
+        0.6 + (player.stamina / 20.0) * 0.4
+    } else if player.exhausted {
+        0.3 // Very slow when exhausted
+    } else {
+        1.0
+    };
+    
+    let base_speed = 10.0;
+    let current_speed = base_speed * speed_modifier;
+    
+    // Handle stamina regeneration/depletion
+    if player.is_moving {
+        // Use stamina while moving
+        player.stamina = (player.stamina - player.stamina_use_rate * dt).max(0.0);
+        
+        // Check if we've reached exhaustion
+        if player.stamina <= 0.1 && !player.exhausted {
+            player.exhausted = true;
+            player.exhaustion_timer = 2.0; // 2 seconds of exhaustion
+        }
+    } else if !player.exhausted {
+        // Regenerate stamina when not moving and not exhausted
+        player.stamina = (player.stamina + player.stamina_regen_rate * dt).min(player.max_stamina);
+    } else if !player.is_moving {
+        // Handle exhaustion recovery timer
+        player.exhaustion_timer -= dt;
+        if player.exhaustion_timer <= 0.0 {
+            player.exhausted = false;
+        }
+        
+        // Slower regeneration when exhausted but not moving
+        player.stamina = (player.stamina + player.stamina_regen_rate * 0.3 * dt).min(player.max_stamina);
+    }
+    
     controller.basis(TnuaBuiltinWalk{
         // The `desired_velocity` determines how the character will move.
-        desired_velocity: direction.normalize_or_zero() * 10.0,
+        desired_velocity: direction.normalize_or_zero() * current_speed,
         // Make the character face in the opposite direction of movement
         desired_forward: Dir3::new(forward_dir).ok(),
         // The `float_height` must be greater (even if by little) from the distance between the
@@ -502,7 +541,10 @@ fn apply_controls(
 
     // Feed the jump action every frame as long as the player holds the jump button. If the player
     // stops holding the jump button, simply stop feeding the action.
-    if keyboard.pressed(KeyCode::ControlLeft) {
+    if keyboard.pressed(KeyCode::ControlLeft) && player.stamina >= 20.0 && !player.exhausted {
+        // Use stamina for jumping
+        player.stamina = (player.stamina - 20.0).max(0.0);
+        
         controller.action(TnuaBuiltinJump{
             // The height is the only mandatory field of the jump button.
             height: 2.0,
@@ -511,7 +553,10 @@ fn apply_controls(
         });
     }
 
-    if keyboard.pressed(KeyCode::Space) {
+    if keyboard.pressed(KeyCode::Space) && player.stamina >= 25.0 && !player.exhausted {
+        // Use stamina for rolling
+        player.stamina = (player.stamina - 25.0).max(0.0);
+        
         // Get the movement direction based on what direction player is going
         let dash_direction = if direction != Vec3::ZERO {
             // Use player's current movement direction
@@ -675,7 +720,7 @@ fn handle_animating(
                 PlayerAnimationState::Rolling=> {
                     animation_player
                         .start(animation_nodes.roll)
-                        .set_speed(2.0);
+                        .set_speed(1.5);
                 }
                 PlayerAnimationState::Tpose=> {
                     animation_player
