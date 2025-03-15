@@ -16,6 +16,7 @@ mod physics;
 mod shader;
 mod progression;
 mod achievements;
+mod npcs;
 
 fn main() {
     println!("Starting Third-Person Example...");
@@ -58,6 +59,7 @@ fn main() {
             shader::ShaderPlugin,
             progression::ProgressionPlugin,
             achievements::AchievementsPlugin,
+            npcs::NpcsPlugin,
         ))
         .run();
 }

@@ -61,7 +61,7 @@ fn spawn_camera(
             hdr: true,
             ..default()
         },
-        Transform::from_xyz(0.0, 16.0, 40.0).looking_at(Vec3::new(0.0, 10.0, 0.0), Vec3::Y),
+        Transform::from_xyz(0.0, 100.0, 0.0).looking_at(Vec3::new(0.0, -10.0, 0.0), Vec3::Y),
         // This is for Lunex aparently, but doesnt work.
         UiSourceCamera::<0>,
         RenderLayers::from_layers(&[0, 2]),
@@ -83,17 +83,18 @@ fn spawn_camera(
         Msaa::Off,
         ScreenSpaceAmbientOcclusion::default(),
         TemporalAntiAliasing::default(),
-        
-        // Add depth prepass for post-processing
+
         MotionBlur{
-            samples: 8,
+            samples: 16,
             shutter_angle: 1.5,
             ..default()
         },
+        /*
         VolumetricFog {
             ambient_intensity: 0.5,
             ..default()
         },
+        */
 
         EnvironmentMapLight{
             diffuse_map: asset_server.load("environment_maps/pisa_diffuse_rgb9e5_zstd.ktx2"),
@@ -156,9 +157,9 @@ fn third_person_camera(
                 // Clamp pitch to prevent flipping and ground clipping
                 // Negative pitch value = looking up, Positive pitch value = looking down
                 // For Souls-like camera: 
-                // - Limit looking down to prevent going through ground (-0.8 means can't look too far down)
+                // - Limit looking down to prevent going through ground (0.5 means can't look too far down under the ground)
                 // - Limit looking up to reasonable angle (1.4 means can look pretty far up but not completely)
-                camera_params.pitch = camera_params.pitch.clamp(-0.8, 1.4);
+                camera_params.pitch = camera_params.pitch.clamp(0.5, 1.4);
             }
             
             // Handle zoom with mouse wheel
@@ -187,126 +188,39 @@ fn third_person_camera(
         // For proper third-person camera collision, we need to:
         // 1. Cast a ray from player (or slightly above) TO the camera's ideal position
         // 2. If this ray hits something, adjust the camera position to be in front of the hit
-        
-        // Setup for ray casting
-        let ray_origin = camera_pivot; // Starting from player's head/pivot
-        let ray_direction = (ideal_camera_pos - ray_origin).normalize(); // Direction TO camera
-        let max_ray_distance = camera_params.distance;
-        
-        // For now, we'll simulate collisions based on camera direction
-        // In a real implementation, we'd use Avian3D physics raycast here
-        
-        // Simulate collision based on camera angle (for demo purposes)
-        // This is just for demonstration - in a real game, use the physics raycast
-        let left_or_right_looking = camera_direction.x.abs() > 0.8; // Looking left/right
-        
-        // Simulate collision when looking sideways
-        let collision_detected = left_or_right_looking;
-        
-        // Print collision status when F1 is pressed
-        if keyboard.just_pressed(KeyCode::F1) {
-            println!("===== COLLISION STATUS =====");
-            println!("Collision detected: {}", collision_detected);
-            println!("Camera direction: X={:.2}, Y={:.2}, Z={:.2}", 
-                camera_direction.x, camera_direction.y, camera_direction.z);
-            println!("Ray direction: X={:.2}, Y={:.2}, Z={:.2}",
-                ray_direction.x, ray_direction.y, ray_direction.z);
-            println!("Player position: {:.2}", player_pos);
-            println!("Ideal camera position: {:.2}", ideal_camera_pos);
-            println!("============================");
-        }
-        
-        if collision_detected {
-            // Apply Souls-like camera adjustments for our simulated collision
-            
-            // When camera collides, it will:
-            // 1. Pull in closer to avoid clipping through walls
-            // 2. Raise slightly to see over obstacles
-            // 3. Peek around obstacles depending on collision side
-            
-            // Set a simulated hit distance (how far along the ray we "hit" something)
-            let simulated_hit_distance = camera_params.distance * 0.3; // Hit 30% of the way to the ideal position
-            
-            // Calculate new distance based on the hit (minus a small offset)
-            let new_distance = simulated_hit_distance - camera_params.collision_offset;
-            
-            // Set the actual camera distance 
-            camera_params.current_actual_distance = new_distance.max(camera_params.min_distance);
-            
-            // Calculate how much we need to adjust (1.0 = full adjustment, 0.0 = no adjustment)
-            let collision_progress = 1.0 - (new_distance / camera_params.distance);
-            
-            // Add vertical adjustment for looking over obstacles
-            let vertical_adjustment = camera_params.vertical_offset * collision_progress;
-            
-            // For demo purposes, peek to the right when looking forward
-            let wall_peek_direction = 1.0;
-            
-            // Calculate the peek amount based on collision severity
-            let horizontal_peek = wall_peek_direction * collision_progress * 0.3;
-            
-            // Calculate how much we're looking down (for ground-clip prevention)
-            let looking_down_factor = ((camera_params.pitch + 0.8) / 2.2).clamp(0.0, 1.0);
-            let ground_clip_prevention = looking_down_factor * 1.5; // Up to 1.5 units extra height
-            
-            // Calculate adjusted camera position with both vertical adjustment and wall peeking
-            let adjusted_camera_offset = camera_rotation * Vec3::new(
-                horizontal_peek, // Add wall peek offset
-                camera_params.height_offset + vertical_adjustment + ground_clip_prevention,
-                camera_params.current_actual_distance // Use the collision-adjusted distance
-            );
-            
-            // Position camera with collision adjustment
-            let target_position = player_pos - adjusted_camera_offset;
-            
-            // Apply smoothing for camera movement
-            let smooth_factor = camera_params.smoothness.clamp(0.0, 0.99);
-            let lerp_factor = 1.0 - smooth_factor.powf(time.delta_secs() * 60.0);
-            
-            // Smoothly move camera toward collision-adjusted position
-            camera_transform.translation = camera_transform.translation.lerp(
-                target_position,
-                lerp_factor
-            );
-        } else {
-            // No collision, use full distance but reset gradually
-            let lerp_speed = 2.0 * time.delta_secs(); // Adjust this value for faster/slower reset
-            camera_params.current_actual_distance = camera_params.current_actual_distance.lerp(
-                camera_params.distance,
-                lerp_speed
-            );
-            
-            // Calculate the orbital camera position with ground-clip prevention
-            // When looking down, we need to raise the camera to avoid clipping through the ground
-            
-            // Calculate how much we're looking down (0 = looking straight, 1 = looking fully down)
-            // This maps our pitch from -0.8 to 1.4 into a 0.0 to 1.0 "looking down" factor
-            let looking_down_factor = ((camera_params.pitch + 0.8) / 2.2).clamp(0.0, 1.0);
-            
-            // Add extra height when looking down to prevent ground clipping
-            let extra_height = looking_down_factor * 1.5; // Up to 1.5 units extra height
-            
-            // Apply the offset with ground-clip prevention
-            let camera_offset = camera_rotation * Vec3::new(
-                0.0,
-                camera_params.height_offset + extra_height,
-                camera_params.current_actual_distance
-            );
-            
-            // The camera should be positioned behind the player
-            let target_position = player_pos - camera_offset;
-            
-            // Apply smoothing for camera movement
-            let smooth_factor = camera_params.smoothness.clamp(0.0, 0.99);
-            let lerp_factor = 1.0 - smooth_factor.powf(time.delta_secs() * 60.0);
-            
-            // Smoothly move camera toward target position
-            camera_transform.translation = camera_transform.translation.lerp(
-                target_position,
-                lerp_factor
-            );
-        }
-        
+
+        let lerp_speed = 2.0 * time.delta_secs(); // Adjust this value for faster/slower reset
+        camera_params.current_actual_distance = camera_params.current_actual_distance.lerp(
+            camera_params.distance,
+            lerp_speed
+        );
+
+        // Calculate how much we're looking down (0 = looking straight, 1 = looking fully down)
+        // This maps our pitch from -0.8 to 1.4 into a 0.0 to 1.0 "looking down" factor
+        let looking_down_factor = ((camera_params.pitch + 0.8) / 2.2).clamp(0.0, 1.0);
+
+        // Add extra height when looking down to prevent ground clipping
+        let extra_height = looking_down_factor * 1.5; // Up to 1.5 units extra height
+
+        // Apply the offset with ground-clip prevention
+        let camera_offset = camera_rotation * Vec3::new(
+            0.0,
+            camera_params.height_offset + extra_height,
+            camera_params.current_actual_distance
+        );
+
+        // The camera should be positioned behind the player
+        let target_position = player_pos - camera_offset;
+
+        // Apply smoothing for camera movement
+        let smooth_factor = camera_params.smoothness.clamp(0.0, 0.99);
+        let lerp_factor = 1.0 - smooth_factor.powf(time.delta_secs() * 60.0);
+
+        // Smoothly move camera toward target position
+        camera_transform.translation = camera_transform.translation.lerp(
+            target_position,
+            lerp_factor
+        );
         // Calculate the focus point (where the camera should look)
         let focus_pos = player_pos + Vec3::new(0.0, camera_params.height_offset * 0.5, 0.0);
         
@@ -518,8 +432,8 @@ impl Plugin for CameraPlugin {
            .add_plugins(TemporalAntiAliasPlugin)
            .add_systems(Update, (
                third_person_camera, 
-               debug_camera_raycast,
-               display_camera_debug_info,
+               // debug_camera_raycast,
+               // display_camera_debug_info,
            ));
     }
 }

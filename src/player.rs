@@ -105,9 +105,9 @@ fn setup_player(
         },
         AnimationStateMachine::new(), // Add our state machine
         AnimationCancellation::default(), // Add cancellation component
-        Transform::from_xyz(0.0, 2.0, 0.0), // Initial position slightly above ground
+        Transform::from_xyz(0.0, 0.0, 0.0), // Initial position slightly above ground
     )).with_children(|children|{
-        children.spawn((Collider::capsule(0.5, 1.0), Transform::from_xyz(0.0, 1.0, 0.0)));
+        children.spawn((Collider::capsule(0.3, 1.0), Transform::from_xyz(0.0, 0.7, 0.0)));
     });
 }
 
